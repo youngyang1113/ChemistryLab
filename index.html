@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>🧪 AI Chemistry Lab | 智能化学虚拟实验室</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/theme.css">
+    <link rel="stylesheet" href="assets/css/animations.css">
+    <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="app-container">
+    <div class="hero glass-card">
+        <h1><i class="fas fa-flask"></i> AI Chemistry Lab <span style="font-size:0.6em;opacity:0.7;"></span></h1>
+        <p>拖拽试剂 · 超真实动画 · 温度/pH实时 · 教师控制台 · 任务系统</p>
+    </div>
+
+    <div class="dashboard">
+        <!-- 左侧实验区 -->
+        <div class="card glass-card">
+            <h2><i class="fas fa-vial"></i> 实验操作台</h2>
+            <div class="reagent-palette" id="reagentPalette"></div>
+            
+            <div class="controls">
+                <button class="btn-primary" id="resetBtn"><i class="fas fa-trash-alt"></i> 重置烧杯</button>
+                <button class="btn-soft" id="taskToggleBtn"><i class="fas fa-tasks"></i> 任务模式: <span id="taskToggleText">关闭</span></button>
+                <button class="btn-good" id="nextTaskBtn"><i class="fas fa-forward-step"></i> 切换任务</button>
+                <button class="btn-dark" id="aiExplainBtn"><i class="fas fa-robot"></i> AI讲解</button>
+                <button class="btn-soft" id="undoBtn"><i class="fas fa-undo"></i> 撤销</button>
+                <button class="btn-warn" id="clearLogBtn"><i class="fas fa-trash"></i> 清空日志</button>
+                <button class="btn-good" id="exportLogBtn"><i class="fas fa-download"></i> 导出CSV</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="taskbox glass-card">
+                    <div><i class="fas fa-bullseye"></i> <strong>🎯 当前任务</strong></div>
+                    <div id="taskText" style="font-weight:600;">自由模式</div>
+                    <div class="progress"><div id="taskProgress"></div></div>
+                    <div id="taskHint" class="small">✨ 探索任意组合</div>
+                </div>
+                <div class="score-preview glass-card">
+                    <div><i class="fas fa-chart-line"></i> 课堂积分</div>
+                    <div class="score-number" id="scoreValue">0</div>
+                    <div>实验: <span id="expCount">0</span> &nbsp;| 成就: <span id="taskDoneCount">0</span></div>
+                </div>
+            </div>
+
+            <!-- 烧杯 -->
+            <div class="reaction-vessel" id="reactionVessel">
+                <div class="vessel-liquid" id="vesselLiquid"></div>
+                <div id="solutionTint" class="solution-tint"></div>
+                <div id="vesselWaiting" class="waiting-reagent">
+                    <div class="empty-message"><i class="fas fa-droplet"></i><p>拖放试剂至烧杯中</p></div>
+                </div>
+                <div id="animationLayer"></div>
+                
+                <!-- 温度计 & pH计 -->
+                <div class="vessel-status">
+                    <div class="thermometer">
+                        <i class="fas fa-thermometer-half"></i>
+                        <span id="tempDisplay">25°C</span>
+                    </div>
+                    <div class="ph-meter">
+                        <span id="phDisplay">7.0</span>
+                        <div id="phBar" class="ph-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="resultArea" class="status warn"><i class="fas fa-info-circle"></i> 等待试剂配对反应...</div>
+            <div id="explainArea" class="status"><i class="fas fa-brain"></i> 点击「AI讲解」获得深度解析</div>
+        </div>
+
+        <!-- 右侧 -->
+        <div>
+            <div class="card glass-card" style="margin-bottom: 24px;">
+                <h3><i class="fas fa-chalkboard-user"></i> 教师控制台 · 实时记录</h3>
+                <div class="teacher-console">
+                    <table class="log-table">
+                        <thead><tr><th>#</th><th>反应物</th><th>类型</th><th>现象</th><th>方程式</th></tr></thead>
+                        <tbody id="logBody"></tbody>
+                    </table>
+                </div>
+                <div class="qr-mini">
+                    <img id="qrImg" class="qrimg" alt="课堂二维码" />
+                    <div>
+                        <input id="qrInput" type="text" placeholder="课堂链接地址" />
+                        <div style="display:flex; gap:6px; margin-top:6px;">
+                            <button class="btn-primary" id="genQRBtn"><i class="fas fa-qrcode"></i> 生成</button>
+                            <button class="btn-soft" id="currentUrlBtn"><i class="fas fa-link"></i> 当前地址</button>
+                            <button class="btn-warn" id="copyLinkBtn"><i class="fas fa-copy"></i> 复制</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="common-reactions card glass-card">
+                <h3><i class="fas fa-table-list"></i> 📚 高中常见反应库</h3>
+                <div style="overflow-x:auto;">
+                    <table class="reaction-mini-table">
+                        <thead><tr><th>反应类型</th><th>原料</th><th>现象</th><th>方程式</th></tr></thead>
+                        <tbody id="refTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 教程模态 -->
+<div id="tutorialModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+    <div class="modal-content glass-card" style="max-width:480px; padding:30px;">
+        <h2>🎓 欢迎使用 AI Chemistry Lab</h2>
+        <p>1. 拖拽或点击试剂到烧杯<br>
+           2. 观察温度、pH和液位变化<br>
+           3. 点击 AI讲解 获取反应原理<br>
+           4. 教师可导出日志用于课堂</p>
+        <button id="closeTutorial" class="btn-primary" style="width:100%; padding:12px;">开始实验</button>
+    </div>
+</div>
+
+<script src="assets/js/reactions.js"></script>
+<script src="assets/js/animation.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
