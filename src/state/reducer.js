@@ -1,18 +1,25 @@
-import { findReaction } from "./reactionRecipes";
+import { findReaction } from "./recipes";
+import {
+  TEMPERATURE,
+  LIQUID_LEVEL,
+  PH,
+  DEFAULT_COLORS,
+  SHAKE_THRESHOLDS,
+} from "../constants/labConfig";
 
 // 实验室初始状态
 export const initialState = {
   beakerContents: [],       // 烧杯中的试剂 ID 数组
-  liquidColor: "#1e293b",   // 当前液体颜色
-  liquidLevel: 10,          // 基础液位 (%)
-  temperature: 25,          // 室温
-  ph: 7,                    // 中性 pH
-  effect: "none",           // "none" | "heat" | "gas" | "precipitate" | "smoke"
-  precipitateColor: "#f5f5f4",
-  reactionLog: [],          // 反应日志
-  currentReaction: null,    // 当前活跃反应
-  isReacting: false,        // 是否正在反应
-  shakeIntensity: 0,        // 0 = 不摇晃, 1-3 = 强度
+  liquidColor: DEFAULT_COLORS.LIQUID,
+  liquidLevel: LIQUID_LEVEL.INITIAL,
+  temperature: TEMPERATURE.ROOM_TEMP,
+  ph: PH.NEUTRAL,
+  effect: "none",
+  precipitateColor: DEFAULT_COLORS.PRECIPITATE,
+  reactionLog: [],
+  currentReaction: null,
+  isReacting: false,
+  shakeIntensity: 0,
 };
 
 // Action 类型
@@ -21,6 +28,7 @@ export const ACTION = {
   RESET_BEAKER: "RESET_BEAKER",
   SET_REACTION_COMPLETE: "SET_REACTION_COMPLETE",
   UPDATE_LIQUID_COLOR: "UPDATE_LIQUID_COLOR",
+  RESTORE_STATE: "RESTORE_STATE",
 };
 
 // Lookup function for reaction matching
@@ -47,7 +55,7 @@ export function labReducer(state, action) {
         return {
           ...state,
           beakerContents: newContents,
-          liquidLevel: Math.min(state.liquidLevel + 8, 85),
+          liquidLevel: Math.min(state.liquidLevel + LIQUID_LEVEL.ADD_REAGENT, LIQUID_LEVEL.MAX_LEVEL),
         };
       }
 
@@ -55,15 +63,24 @@ export function labReducer(state, action) {
       const reaction = tryReaction(state.beakerContents, reagentId);
 
       if (reaction) {
-        const newTemp = Math.max(5, Math.min(100, state.temperature + reaction.tempDelta));
+        const newTemp = Math.max(
+          TEMPERATURE.MIN_TEMP,
+          Math.min(TEMPERATURE.MAX_TEMP, state.temperature + reaction.tempDelta)
+        );
         const shakeIntensity =
-          reaction.tempDelta >= 50 ? 3 : reaction.tempDelta >= 25 ? 2 : reaction.tempDelta >= 15 ? 1 : 0;
+          reaction.tempDelta >= SHAKE_THRESHOLDS.HIGH
+            ? 3
+            : reaction.tempDelta >= SHAKE_THRESHOLDS.MEDIUM
+            ? 2
+            : reaction.tempDelta >= SHAKE_THRESHOLDS.LOW
+            ? 1
+            : 0;
 
         return {
           ...state,
           beakerContents: newContents,
           liquidColor: reaction.color,
-          liquidLevel: Math.min(state.liquidLevel + 12, 85),
+          liquidLevel: Math.min(state.liquidLevel + LIQUID_LEVEL.REACTION_BONUS, LIQUID_LEVEL.MAX_LEVEL),
           temperature: newTemp,
           ph: reaction.ph,
           effect: reaction.effect,
@@ -86,7 +103,7 @@ export function labReducer(state, action) {
       return {
         ...state,
         beakerContents: newContents,
-        liquidLevel: Math.min(state.liquidLevel + 8, 85),
+        liquidLevel: Math.min(state.liquidLevel + LIQUID_LEVEL.ADD_REAGENT, LIQUID_LEVEL.MAX_LEVEL),
       };
     }
 
@@ -104,6 +121,15 @@ export function labReducer(state, action) {
       return {
         ...state,
         liquidColor: action.payload.color,
+      };
+
+    case ACTION.RESTORE_STATE:
+      return {
+        ...initialState,
+        ...action.payload,
+        isReacting: false,
+        shakeIntensity: 0,
+        currentReaction: null,
       };
 
     default:

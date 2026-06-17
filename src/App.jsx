@@ -1,26 +1,41 @@
 import { DragDropContext } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLabStore } from "./hooks/useLabStore";
 import ReagentShelf from "./components/ReagentShelf";
 import Beaker from "./components/Beaker";
 import DataDashboard from "./components/DataDashboard";
 import TeacherConsole from "./components/TeacherConsole";
 import AIExplanation from "./components/AIExplanation";
+import { ToastContainer, toast } from "./components/Toast";
 
 function CursorGlow() {
-  const [pos, setPos] = useState({ x: -300, y: -300 });
+  const glowRef = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => setPos({ x: e.clientX, y: e.clientY });
-    window.addEventListener("mousemove", handler);
-    return () => window.removeEventListener("mousemove", handler);
+    const el = glowRef.current;
+    if (!el) return;
+
+    let rafId = null;
+    const handler = (e) => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        el.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+      });
+    };
+
+    window.addEventListener("mousemove", handler, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", handler);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   return (
     <div
+      ref={glowRef}
       className="cursor-glow-light"
-      style={{ left: pos.x, top: pos.y }}
+      style={{ left: 0, top: 0, transform: "translate(-300px, -300px)" }}
     />
   );
 }
@@ -94,7 +109,7 @@ function StatusBanner({ reaction }) {
 }
 
 export default function App() {
-  const { state, addReagent, resetBeaker } = useLabStore();
+  const { state, addReagent, resetBeaker, undo, redo, canUndo, canRedo } = useLabStore();
   const [showTeacher, setShowTeacher] = useState(false);
   const [showAI, setShowAI] = useState(false);
 
@@ -107,6 +122,23 @@ export default function App() {
     },
     [addReagent]
   );
+
+  // 反应发生时显示 Toast
+  const prevReactionRef = useRef(null);
+  useEffect(() => {
+    if (state.currentReaction && state.isReacting && state.currentReaction !== prevReactionRef.current) {
+      prevReactionRef.current = state.currentReaction;
+      toast.reaction(state.currentReaction, {
+        action: {
+          label: "查看 AI 讲解",
+          onClick: () => setShowAI(true),
+        },
+      });
+    }
+    if (!state.isReacting) {
+      prevReactionRef.current = null;
+    }
+  }, [state.currentReaction, state.isReacting]);
 
   return (
     <div className="h-screen w-screen overflow-hidden text-gray-900 relative" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 40%, #f1f5f9 100%)" }}>
@@ -138,20 +170,57 @@ export default function App() {
 
             {/* Center: Beaker workspace */}
             <main className="flex-1 flex flex-col items-center justify-center relative p-8" style={{ background: "radial-gradient(ellipse at 50% 40%, rgba(219,234,254,0.4) 0%, transparent 70%)" }}>
-              {/* Reset button */}
-              <motion.button
-                onClick={resetBeaker}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="absolute top-6 right-6 text-[11px] font-medium text-gray-500 hover:text-gray-700 
-                  glass-light rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
-                重置
-              </motion.button>
+              {/* Control buttons */}
+              <div className="absolute top-6 right-6 flex items-center gap-2">
+                {/* Undo button */}
+                <motion.button
+                  onClick={undo}
+                  disabled={!canUndo}
+                  whileHover={canUndo ? { scale: 1.05 } : {}}
+                  whileTap={canUndo ? { scale: 0.95 } : {}}
+                  className={`text-[11px] font-medium glass-light rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5
+                    ${canUndo ? "text-gray-500 hover:text-gray-700" : "text-gray-300 cursor-not-allowed"}`}
+                  title="撤销 (Ctrl+Z)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 10h10a5 5 0 015 5v2" />
+                    <path d="M3 10l4-4M3 10l4 4" />
+                  </svg>
+                  撤销
+                </motion.button>
+
+                {/* Redo button */}
+                <motion.button
+                  onClick={redo}
+                  disabled={!canRedo}
+                  whileHover={canRedo ? { scale: 1.05 } : {}}
+                  whileTap={canRedo ? { scale: 0.95 } : {}}
+                  className={`text-[11px] font-medium glass-light rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5
+                    ${canRedo ? "text-gray-500 hover:text-gray-700" : "text-gray-300 cursor-not-allowed"}`}
+                  title="重做 (Ctrl+Y)"
+                >
+                  重做
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 10H11a5 5 0 00-5 5v2" />
+                    <path d="M21 10l-4-4M21 10l-4 4" />
+                  </svg>
+                </motion.button>
+
+                {/* Reset button */}
+                <motion.button
+                  onClick={resetBeaker}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="text-[11px] font-medium text-gray-500 hover:text-gray-700 
+                    glass-light rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                  重置
+                </motion.button>
+              </div>
 
               {/* Reaction type indicator */}
               <AnimatePresence>
@@ -233,6 +302,9 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 }
