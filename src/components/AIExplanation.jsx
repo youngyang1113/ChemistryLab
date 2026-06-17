@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const API_KEY = import.meta.env.VITE_MIMO_API_KEY || "";
@@ -9,16 +9,17 @@ export default function AIExplanation({ reaction, onClose }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [streamedText, setStreamedText] = useState("");
+  const abortControllerRef = useRef(null);
 
-  useEffect(() => {
-    if (reaction && API_KEY) {
-      generateExplanation();
-    } else if (!API_KEY) {
-      setError("API Key 未配置。请在 .env 文件中设置 VITE_MIMO_API_KEY");
+  const generateExplanation = useCallback(async () => {
+    if (!reaction) return;
+
+    // 取消之前的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, [reaction]);
+    abortControllerRef.current = new AbortController();
 
-  const generateExplanation = async () => {
     setIsLoading(true);
     setError(null);
     setExplanation("");
@@ -62,6 +63,7 @@ export default function AIExplanation({ reaction, onClose }) {
           temperature: 0.7,
           max_tokens: 1000,
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -98,15 +100,29 @@ export default function AIExplanation({ reaction, onClose }) {
 
       setExplanation(fullText);
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("AI 讲解错误:", err);
-      // 如果 API 失败，使用本地讲解
       const localExplanation = generateLocalExplanation(reaction);
       setExplanation(localExplanation);
       setStreamedText(localExplanation);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [reaction]);
+
+  useEffect(() => {
+    if (reaction && API_KEY) {
+      generateExplanation();
+    } else if (!API_KEY) {
+      setError("API Key 未配置。请在 .env 文件中设置 VITE_MIMO_API_KEY");
+    }
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [reaction, generateExplanation]);
 
   const generateLocalExplanation = (reaction) => {
     const parts = [];
@@ -238,32 +254,151 @@ export default function AIExplanation({ reaction, onClose }) {
 }
 
 function ReactMarkdown({ content }) {
+  const renderInlineContent = (text) => {
+    // 支持行内 HTML 标签和样式
+    const parts = [];
+    let remaining = text;
+    let key = 0;
+
+    // 匹配 HTML 标签（如 <span style="...">, <b>, <i>, <sub>, <sup> 等）
+    const htmlRegex = /<(span|b|i|strong|em|sub|sup|code|mark)(?:\s+[^>]*)?>(.*?)<\/\1>/gs;
+    let match;
+    let lastIndex = 0;
+
+    while ((match = htmlRegex.exec(text)) !== null) {
+      // 添加标签前的普通文本
+      if (match.index > lastIndex) {
+        parts.push(
+          <span key={key++}>{text.slice(lastIndex, match.index)}</span>
+        );
+      }
+
+      const tag = match[1];
+      const innerContent = match[2];
+      const fullTag = match[0];
+
+      // 提取 style 属性
+      const styleMatch = fullTag.match(/style="([^"]*)"/);
+      const style = {};
+      if (styleMatch) {
+        styleMatch[1].split(";").forEach((s) => {
+          const [prop, val] = s.split(":").map((p) => p.trim());
+          if (prop && val) {
+            // 转换 CSS 属性名为 camelCase
+            const camelProp = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+            style[camelProp] = val;
+          }
+        });
+      }
+
+      const Tag = tag === "span" ? "span" : tag;
+      parts.push(
+        <Tag key={key++} style={style} className={tag === "mark" ? "bg-yellow-200 px-0.5 rounded" : ""}>
+          {renderInlineContent(innerContent)}
+        </Tag>
+      );
+
+      lastIndex = match.index + fullTag.length;
+    }
+
+    // 添加剩余文本
+    if (lastIndex < text.length) {
+      parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+    }
+
+    // 如果没有 HTML 标签，处理 Markdown 行内语法
+    if (parts.length === 0) {
+      return processInlineMarkdown(text);
+    }
+
+    return parts;
+  };
+
+  const processInlineMarkdown = (text) => {
+    // 处理 **粗体**, *斜体*, `代码`, ~删除线~ 等
+    const parts = [];
+    let remaining = text;
+    let key = 0;
+
+    const inlineRegex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|~~(.+?)~~)/g;
+    let match;
+    let lastIndex = 0;
+
+    while ((match = inlineRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>);
+      }
+
+      if (match[2]) {
+        // **粗体**
+        parts.push(<strong key={key++} className="font-semibold">{match[2]}</strong>);
+      } else if (match[3]) {
+        // *斜体*
+        parts.push(<em key={key++} className="italic">{match[3]}</em>);
+      } else if (match[4]) {
+        // `代码`
+        parts.push(
+          <code key={key++} className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-pink-600">
+            {match[4]}
+          </code>
+        );
+      } else if (match[5]) {
+        // ~~删除线~~
+        parts.push(<del key={key++} className="line-through text-gray-400">{match[5]}</del>);
+      }
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
   const renderContent = (text) => {
     const lines = text.split("\n");
     const elements = [];
     let inCodeBlock = false;
     let codeContent = "";
     let listItems = [];
+    let orderedListItems = [];
 
     const flushList = () => {
       if (listItems.length > 0) {
         elements.push(
-          <ul key={`list-${elements.length}`} className="list-disc pl-5 space-y-1 my-2">
+          <ul key={`ul-${elements.length}`} className="list-disc pl-5 space-y-1 my-2">
             {listItems.map((item, i) => (
-              <li key={i} className="text-sm text-gray-700">{item}</li>
+              <li key={i} className="text-sm text-gray-700 leading-relaxed">
+                {renderInlineContent(item)}
+              </li>
             ))}
           </ul>
         );
         listItems = [];
       }
+      if (orderedListItems.length > 0) {
+        elements.push(
+          <ol key={`ol-${elements.length}`} className="list-decimal pl-5 space-y-1 my-2">
+            {orderedListItems.map((item, i) => (
+              <li key={i} className="text-sm text-gray-700 leading-relaxed">
+                {renderInlineContent(item)}
+              </li>
+            ))}
+          </ol>
+        );
+        orderedListItems = [];
+      }
     };
 
     lines.forEach((line, i) => {
+      // 代码块处理
       if (line.startsWith("```")) {
         if (inCodeBlock) {
           elements.push(
-            <pre key={`code-${i}`} className="bg-gray-100 rounded-lg p-3 my-2 overflow-x-auto">
-              <code className="text-sm font-mono text-gray-800">{codeContent}</code>
+            <pre key={`code-${i}`} className="bg-gray-900 text-gray-100 rounded-lg p-4 my-3 overflow-x-auto text-sm">
+              <code className="font-mono">{codeContent}</code>
             </pre>
           );
           codeContent = "";
@@ -280,30 +415,64 @@ function ReactMarkdown({ content }) {
         return;
       }
 
-      if (line.startsWith("### ")) {
+      // 标题处理
+      if (line.startsWith("#### ")) {
         flushList();
         elements.push(
-          <h3 key={i} className="font-semibold text-gray-900 mt-4 mb-2">{line.slice(4)}</h3>
+          <h4 key={i} className="font-semibold text-gray-800 mt-3 mb-1 text-sm">{renderInlineContent(line.slice(5))}</h4>
+        );
+      } else if (line.startsWith("### ")) {
+        flushList();
+        elements.push(
+          <h3 key={i} className="font-semibold text-gray-900 mt-4 mb-2">{renderInlineContent(line.slice(4))}</h3>
         );
       } else if (line.startsWith("## ")) {
         flushList();
         elements.push(
-          <h2 key={i} className="font-bold text-gray-900 text-lg mt-4 mb-2">{line.slice(3)}</h2>
+          <h2 key={i} className="font-bold text-gray-900 text-lg mt-4 mb-2">{renderInlineContent(line.slice(3))}</h2>
         );
-      } else if (line.startsWith("- ")) {
-        listItems.push(line.slice(2));
-      } else if (line.startsWith("**") && line.endsWith("**")) {
+      } else if (line.startsWith("# ")) {
         flushList();
         elements.push(
-          <p key={i} className="font-semibold text-gray-800 my-1">{line.slice(2, -2)}</p>
+          <h1 key={i} className="font-bold text-gray-900 text-xl mt-4 mb-2">{renderInlineContent(line.slice(2))}</h1>
         );
-      } else if (line.trim() === "") {
+      }
+      // 无序列表
+      else if (line.match(/^[\-\*]\s/)) {
+        orderedListItems.length > 0 && flushList();
+        listItems.push(line.slice(2));
+      }
+      // 有序列表
+      else if (line.match(/^\d+\.\s/)) {
+        listItems.length > 0 && flushList();
+        orderedListItems.push(line.replace(/^\d+\.\s/, ""));
+      }
+      // 引用块
+      else if (line.startsWith("> ")) {
+        flushList();
+        elements.push(
+          <blockquote key={i} className="border-l-4 border-purple-300 pl-4 py-1 my-2 bg-purple-50 rounded-r-lg">
+            <p className="text-sm text-gray-700 italic">{renderInlineContent(line.slice(2))}</p>
+          </blockquote>
+        );
+      }
+      // 水平线
+      else if (line.match(/^[-*_]{3,}$/)) {
+        flushList();
+        elements.push(<hr key={i} className="my-4 border-gray-200" />);
+      }
+      // 空行
+      else if (line.trim() === "") {
         flushList();
         elements.push(<div key={i} className="h-2" />);
-      } else {
+      }
+      // 普通段落
+      else {
         flushList();
         elements.push(
-          <p key={i} className="text-sm text-gray-700 my-1">{line}</p>
+          <p key={i} className="text-sm text-gray-700 my-1.5 leading-relaxed">
+            {renderInlineContent(line)}
+          </p>
         );
       }
     });
@@ -312,5 +481,5 @@ function ReactMarkdown({ content }) {
     return elements;
   };
 
-  return <div>{renderContent(content)}</div>;
+  return <div className="space-y-1">{renderContent(content)}</div>;
 }

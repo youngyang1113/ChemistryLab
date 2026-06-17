@@ -71,6 +71,12 @@ export const reagents = [
   { id: "SiO2", name: "二氧化硅", formula: "SiO₂", category: "oxide", color: "#f3f4f6" },
   { id: "H2O", name: "水", formula: "H₂O", category: "oxide", color: "#60a5fa" },
   { id: "H2O2", name: "过氧化氢", formula: "H₂O₂", category: "oxide", color: "#bfdbfe" },
+  
+  // 指示剂
+  { id: "酚酞", name: "酚酞", formula: "C₂₀H₁₄O₄", category: "indicator", color: "#ec4899" },
+  { id: "石蕊", name: "石蕊", formula: "Litmus", category: "indicator", color: "#7c3aed" },
+  { id: "甲基橙", name: "甲基橙", formula: "C₁₄H₁₄N₃NaO₃S", category: "indicator", color: "#f97316" },
+  { id: "品红", name: "品红", formula: "Fuchsin", category: "indicator", color: "#be185d" },
 ];
 
 // 反应类型中文名称
@@ -85,6 +91,7 @@ const reactionTypeNames = {
   "Redox": "氧化还原反应",
   "Decomposition": "分解反应",
   "Combination": "化合反应",
+  "Complexation": "络合反应",
 };
 
 // 反应配方 - 高中化学常见反应
@@ -422,7 +429,14 @@ export const reactionRecipes = {
     tempDelta: 2,
     effect: "precipitate",
     precipitateColor: "#d1fae5",
-    description: "生成白色氢氧化亚铁沉淀，迅速变灰绿色最终变红褐色",
+    description: "生成白色氢氧化亚铁沉淀，迅速变灰绿色最终氧化为红褐色",
+    colorSequence: [
+      { color: "#f0fdf4", duration: 0, label: "白色絮状沉淀" },
+      { color: "#bbf7d0", duration: 500, label: "开始变灰绿" },
+      { color: "#86efac", duration: 1000, label: "灰绿色" },
+      { color: "#fca5a5", duration: 2000, label: "氧化为红褐色" },
+      { color: "#fecaca", duration: 3000, label: "最终红褐色 Fe(OH)₃" },
+    ],
   },
   "AlCl3+NaOH": {
     type: reactionTypeNames["Precipitation"],
@@ -465,14 +479,14 @@ export const reactionRecipes = {
     description: "检验硫酸根离子：生成白色沉淀",
   },
   "FeCl3+KSCN": {
-    type: reactionTypeNames["Precipitation"],
+    type: reactionTypeNames["Complexation"],
     equation: "FeCl₃ + 3KSCN → Fe(SCN)₃ + 3KCl",
     color: "#ef4444",
     ph: 5,
     tempDelta: 0,
-    effect: "precipitate",
+    effect: "colorChange",
     precipitateColor: "#dc2626",
-    description: "检验铁离子：溶液变为血红色",
+    description: "铁离子与硫氰酸根络合，溶液变为血红色（特征显色反应）",
   },
   "Na2SiO3+HCl": {
     type: reactionTypeNames["Precipitation"],
@@ -829,23 +843,110 @@ export const reactionRecipes = {
     effect: "heat",
     description: "三氧化硫溶于水生成硫酸",
   },
+
+  // ==================== 三元反应 ====================
+  "HCl+NaOH+酚酞": {
+    type: reactionTypeNames["Neutralization"],
+    equation: "HCl + NaOH → NaCl + H₂O（酚酞指示剂）",
+    color: "#f472b6",
+    ph: 7,
+    tempDelta: 15,
+    effect: "colorChange",
+    description: "酸碱中和滴定，酚酞由红色变为无色",
+    reactants: ["HCl", "NaOH", "酚酞"],
+  },
+  "Fe+CuSO4+AgNO3": {
+    type: reactionTypeNames["Displacement"],
+    equation: "Fe + CuSO₄ → FeSO₄ + Cu; Cu + 2AgNO₃ → Cu(NO₃)₂ + 2Ag",
+    color: "#e5e7eb",
+    ph: 5,
+    tempDelta: 8,
+    effect: "precipitate",
+    precipitateColor: "#e5e7eb",
+    description: "铁先置换铜，铜再置换银（活动性顺序验证）",
+    reactants: ["Fe", "CuSO4", "AgNO3"],
+  },
+  "NaOH+CuSO4+酒石酸钾钠": {
+    type: reactionTypeNames["Complexation"],
+    equation: "Cu²⁺ + 2OH⁻ + 酒石酸钾钠 → 络合物",
+    color: "#a78bfa",
+    ph: 12,
+    tempDelta: 5,
+    effect: "colorChange",
+    description: "斐林试剂反应，生成深蓝色络合物",
+    reactants: ["NaOH", "CuSO4", "酒石酸钾钠"],
+  },
 };
 
-// 生成反应键（双向匹配）
+// 预处理：生成反应物集合索引（用于无序子集匹配）
+const reactionIndex = new Map();
+
+Object.entries(reactionRecipes).forEach(([key, recipe]) => {
+  // 解析反应物
+  let reactants;
+  if (recipe.reactants) {
+    reactants = recipe.reactants;
+  } else {
+    reactants = key.split("+");
+  }
+
+  // 生成排序后的键（用于快速查找）
+  const sortedKey = [...reactants].sort().join("+");
+  reactionIndex.set(sortedKey, { key, recipe, reactants });
+});
+
+// 生成反应物集合的排序键
+function getSortedKey(reactants) {
+  return [...reactants].sort().join("+");
+}
+
+// 无序子集匹配算法
+// 检查 existing + incoming 是否能匹配任何反应
+export function findReaction(existing, incoming) {
+  const allReactants = [...existing, incoming];
+  const sortedKey = getSortedKey(allReactants);
+
+  // 精确匹配：所有反应物完全匹配
+  const exactMatch = reactionIndex.get(sortedKey);
+  if (exactMatch) {
+    return { key: exactMatch.key, ...exactMatch.recipe };
+  }
+
+  // 子集匹配：检查是否有反应是当前试剂的子集
+  // 这允许用户分批添加试剂，只要最终包含所有反应物即可触发反应
+  for (const [indexKey, { key, recipe, reactants }] of reactionIndex) {
+    // 检查 reactants 是否是 allReactants 的子集
+    const isSubset = reactants.every((r) => allReactants.includes(r));
+    if (isSubset && reactants.length === allReactants.length) {
+      return { key, ...recipe };
+    }
+  }
+
+  // 向前兼容：尝试旧的二元匹配方式
+  for (const reagent of existing) {
+    const key1 = `${reagent}+${incoming}`;
+    const key2 = `${incoming}+${reagent}`;
+    if (reactionRecipes[key1]) return { key: key1, ...reactionRecipes[key1] };
+    if (reactionRecipes[key2]) return { key: key2, ...reactionRecipes[key2] };
+  }
+
+  // 单物质反应（分解反应等）
+  if (reactionRecipes[incoming]) {
+    return { key: incoming, ...reactionRecipes[incoming] };
+  }
+
+  return null;
+}
+
+// 保留旧的 getReactionKey 函数以兼容其他代码
 export function getReactionKey(a, b) {
   const key1 = `${a}+${b}`;
   const key2 = `${b}+${a}`;
   if (reactionRecipes[key1]) return key1;
   if (reactionRecipes[key2]) return key2;
-  // 单物质反应（分解反应等）
   if (reactionRecipes[a]) return a;
   if (reactionRecipes[b]) return b;
   return null;
-}
-
-export function findReaction(a, b) {
-  const key = getReactionKey(a, b);
-  return key ? { key, ...reactionRecipes[key] } : null;
 }
 
 // 分类颜色（亮色主题）
@@ -856,6 +957,7 @@ export const categoryColors = {
   metal: "from-slate-100 to-gray-50",
   nonmetal: "from-yellow-100 to-amber-50",
   oxide: "from-red-100 to-rose-50",
+  indicator: "from-pink-100 to-fuchsia-50",
 };
 
 // 分类中文名称
@@ -866,4 +968,5 @@ export const categoryLabels = {
   metal: "金属",
   nonmetal: "非金属",
   oxide: "氧化物",
+  indicator: "指示剂",
 };

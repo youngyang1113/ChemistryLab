@@ -24,6 +24,25 @@ function HeatGlow({ active, temperature }) {
   );
 }
 
+function ColorChangeGlow({ active, color }) {
+  if (!active) return null;
+  return (
+    <motion.div
+      className="absolute inset-0 rounded-[inherit] pointer-events-none z-5"
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: [0.2, 0.5, 0.2],
+        boxShadow: [
+          `inset 0 0 30px ${color}40, 0 0 20px ${color}20`,
+          `inset 0 0 50px ${color}60, 0 0 40px ${color}30`,
+          `inset 0 0 30px ${color}40, 0 0 20px ${color}20`,
+        ],
+      }}
+      transition={{ duration: 1, repeat: Infinity }}
+    />
+  );
+}
+
 function WavyLiquid({ color, level }) {
   return (
     <motion.div
@@ -198,6 +217,7 @@ export default function Beaker({ state }) {
           <div className="relative w-full h-full rounded-2xl overflow-hidden z-10">
             <BeakerGlass />
             <HeatGlow active={effect === "heat"} temperature={temperature} />
+            <ColorChangeGlow active={effect === "colorChange"} color={liquidColor} />
 
             {/* Liquid */}
             <AnimatePresence>

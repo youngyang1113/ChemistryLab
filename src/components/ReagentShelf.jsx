@@ -7,7 +7,9 @@ const categoryIcons = {
   base: "💧",
   salt: "🧂",
   metal: "⚙️",
+  nonmetal: "🌫️",
   oxide: "🔥",
+  indicator: "🎨",
 };
 
 function ReagentCard({ reagent, index, onClick, isInBeaker }) {

@@ -20,6 +20,7 @@ export const ACTION = {
   ADD_REAGENT: "ADD_REAGENT",
   RESET_BEAKER: "RESET_BEAKER",
   SET_REACTION_COMPLETE: "SET_REACTION_COMPLETE",
+  UPDATE_LIQUID_COLOR: "UPDATE_LIQUID_COLOR",
 };
 
 // Lookup function for reaction matching
@@ -97,6 +98,12 @@ export function labReducer(state, action) {
         ...state,
         isReacting: false,
         shakeIntensity: 0,
+      };
+
+    case ACTION.UPDATE_LIQUID_COLOR:
+      return {
+        ...state,
+        liquidColor: action.payload.color,
       };
 
     default:
