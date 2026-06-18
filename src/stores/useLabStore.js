@@ -197,6 +197,10 @@ export function useLabStore() {
 
   // ==================== 返回统一接口 ====================
 
+  // 从 historyStore 状态中读取 canUndo/canRedo，避免每次渲染都调用函数
+  const canUndo = historyStore.currentIndex > 0;
+  const canRedo = historyStore.currentIndex < historyStore.history.length - 1;
+
   return {
     // 烧杯状态
     state: {
@@ -218,8 +222,8 @@ export function useLabStore() {
     resetBeaker,
     undo,
     redo,
-    canUndo: historyStore.canUndo(),
-    canRedo: historyStore.canRedo(),
+    canUndo,
+    canRedo,
 
     // 子 Store 访问（高级用法）
     beakerStore,
