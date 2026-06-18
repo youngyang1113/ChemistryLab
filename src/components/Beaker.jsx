@@ -184,8 +184,8 @@ export default function Beaker({ state }) {
         <motion.div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className="relative w-full max-w-[320px] mx-auto"
-          style={{ height: 'calc(100vh - 300px)', minHeight: '280px', maxHeight: '500px' }}
+          className="relative w-full max-w-[400px] mx-auto"
+          style={{ height: 'calc(100vh - 250px)', minHeight: '350px', maxHeight: '600px' }}
           animate={
             shakeIntensity > 0
               ? {

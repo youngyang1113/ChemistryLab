@@ -33,10 +33,19 @@ export const ACTION = {
 
 // Lookup function for reaction matching
 function tryReaction(existing, incoming) {
+  // 将已有试剂和新试剂组合成完整数组进行匹配
+  const allReactants = [...existing, incoming];
+  
+  // 尝试所有可能的二元组合
   for (const reagent of existing) {
-    const reaction = findReaction(reagent, incoming);
+    const reaction = findReaction([reagent], incoming);
     if (reaction) return reaction;
   }
+  
+  // 尝试完整组合（支持三元及以上反应）
+  const fullReaction = findReaction(existing, incoming);
+  if (fullReaction) return fullReaction;
+  
   return null;
 }
 

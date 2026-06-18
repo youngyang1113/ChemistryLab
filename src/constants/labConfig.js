@@ -82,6 +82,7 @@ export const REAGENT_CATEGORIES = {
   metal: { label: "金属", icon: "⚙️", color: "from-slate-100 to-gray-50" },
   nonmetal: { label: "非金属", icon: "🌫️", color: "from-yellow-100 to-amber-50" },
   oxide: { label: "氧化物", icon: "🔥", color: "from-red-100 to-rose-50" },
+  gas: { label: "气体", icon: "💨", color: "from-sky-100 to-cyan-50" },
   indicator: { label: "指示剂", icon: "🎨", color: "from-pink-100 to-fuchsia-50" },
 };
 
