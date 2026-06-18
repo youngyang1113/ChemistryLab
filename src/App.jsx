@@ -1,10 +1,13 @@
 import { DragDropContext } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
-// 使用新的 V2 Hook，保持向后兼容
-import { useLabStoreV2 } from "./hooks/useLabStoreV2";
-// 旧的 Hook 保留作为备用
-// import { useLabStore } from "./hooks/useLabStore";
+// 使用新的 V3 Store（基于 Zustand）
+import { useLabStore } from "./stores/useLabStore";
+// 子 Store 可以按需直接导入以获得更好的性能
+import useUIStore, {
+  useShowTeacherConsole,
+  useShowAIExplanation,
+} from "./stores/useUIStore";
 import ReagentShelf from "./components/ReagentShelf";
 import Beaker from "./components/Beaker";
 import DataDashboard from "./components/DataDashboard";
@@ -113,10 +116,13 @@ function StatusBanner({ reaction }) {
 }
 
 export default function App() {
-  // 使用新的 V2 Hook
-  const { state, addReagent, resetBeaker, undo, redo, canUndo, canRedo } = useLabStoreV2();
-  const [showTeacher, setShowTeacher] = useState(false);
-  const [showAI, setShowAI] = useState(false);
+  // 使用新的 V3 Store（基于 Zustand）
+  const { state, addReagent, resetBeaker, undo, redo, canUndo, canRedo } = useLabStore();
+
+  // UI 状态使用独立的 store，避免业务状态变化触发 UI 重渲染
+  const showTeacher = useShowTeacherConsole();
+  const showAI = useShowAIExplanation();
+  const { openTeacherConsole, openAIExplanation, closeAIExplanation } = useUIStore();
 
   const handleDragEnd = useCallback(
     (result) => {
@@ -136,14 +142,14 @@ export default function App() {
       toast.reaction(state.currentReaction, {
         action: {
           label: "查看 AI 讲解",
-          onClick: () => setShowAI(true),
+          onClick: () => openAIExplanation(),
         },
       });
     }
     if (!state.isReacting) {
       prevReactionRef.current = null;
     }
-  }, [state.currentReaction, state.isReacting]);
+  }, [state.currentReaction, state.isReacting, openAIExplanation]);
 
   return (
     <div className="h-screen w-screen overflow-hidden text-gray-900 relative" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 40%, #f1f5f9 100%)" }}>
@@ -151,8 +157,8 @@ export default function App() {
 
       <div className="relative z-10 h-full flex flex-col">
         <Header
-          onTeacherOpen={() => setShowTeacher(true)}
-          onAIOpen={() => setShowAI(!showAI)}
+          onTeacherOpen={() => openTeacherConsole()}
+          onAIOpen={() => showAI ? closeAIExplanation() : openAIExplanation()}
         />
 
         {/* Status banner */}
@@ -269,7 +275,7 @@ export default function App() {
                       {state.currentReaction.description}
                     </p>
                     <button
-                      onClick={() => setShowAI(true)}
+                      onClick={() => openAIExplanation()}
                       className="mt-2 px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-xs hover:from-purple-600 hover:to-pink-600 transition-all"
                     >
                       查看 AI 讲解
@@ -293,7 +299,7 @@ export default function App() {
           <TeacherConsole
             state={state}
             isOpen={showTeacher}
-            onClose={() => setShowTeacher(false)}
+            onClose={() => useUIStore.getState().closeTeacherConsole()}
           />
         )}
       </AnimatePresence>
@@ -303,7 +309,7 @@ export default function App() {
         {showAI && state.currentReaction && (
           <AIExplanation
             reaction={state.currentReaction}
-            onClose={() => setShowAI(false)}
+            onClose={() => closeAIExplanation()}
           />
         )}
       </AnimatePresence>
