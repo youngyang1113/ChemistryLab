@@ -13,19 +13,42 @@ class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, errorInfo) {
     console.error("React Error:", error, errorInfo);
-    // 移除 fallback
-    const fallback = document.getElementById("fallback");
-    if (fallback) fallback.remove();
   }
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "#a1a1aa", fontFamily: "sans-serif", fontSize: "14px", flexDirection: "column", gap: "8px", textAlign: "center", padding: "20px" }}>
-          <div style={{ fontSize: "24px", marginBottom: "8px" }}>加载出错</div>
-          <div style={{ color: "#ef4444", fontSize: "12px", maxWidth: "400px" }}>{this.state.error?.message}</div>
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          height: "100vh", 
+          background: "#f8fafc",
+          color: "#374151", 
+          fontFamily: "Inter, system-ui, sans-serif", 
+          fontSize: "14px", 
+          flexDirection: "column", 
+          gap: "16px", 
+          textAlign: "center", 
+          padding: "20px" 
+        }}>
+          <div style={{ fontSize: "48px" }}>⚠️</div>
+          <div style={{ fontSize: "20px", fontWeight: "600" }}>加载出错</div>
+          <div style={{ color: "#ef4444", fontSize: "13px", maxWidth: "400px", background: "#fef2f2", padding: "12px", borderRadius: "8px" }}>
+            {this.state.error?.message || "未知错误"}
+          </div>
           <button 
             onClick={() => window.location.reload()} 
-            style={{ marginTop: "16px", padding: "8px 16px", background: "#3b82f6", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}
+            style={{ 
+              marginTop: "8px", 
+              padding: "10px 24px", 
+              background: "#3b82f6", 
+              color: "white", 
+              border: "none", 
+              borderRadius: "8px", 
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}
           >
             重新加载
           </button>
@@ -40,11 +63,17 @@ class ErrorBoundary extends React.Component {
 const removeFallback = () => {
   const fallback = document.getElementById("fallback");
   if (fallback) {
+    fallback.style.display = "none";
     fallback.remove();
   }
 };
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const rootElement = document.getElementById("root");
+
+// 清空 root 内容（移除 fallback）
+rootElement.innerHTML = "";
+
+const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
@@ -52,6 +81,3 @@ root.render(
     </ErrorBoundary>
   </React.StrictMode>
 );
-
-// 应用加载成功后移除 fallback
-removeFallback();
