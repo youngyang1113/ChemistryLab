@@ -1,12 +1,26 @@
+/**
+ * Beaker 组件 - 性能优化版
+ * 
+ * 优化点：
+ * 1. 使用 Canvas 特效替代 React 组件特效（气泡、沉淀、烟雾）
+ * 2. 使用 useMemo 缓存计算结果
+ * 3. 使用 useCallback 缓存事件处理函数
+ * 4. 使用 React.memo 避免不必要的重渲染
+ * 5. 使用索引优化 reagentList 查找 O(n) -> O(1)
+ */
+
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Droppable } from "@hello-pangea/dnd";
-import { useState, useEffect, useRef } from "react";
-import BubbleEffect from "./BubbleEffect";
-import PrecipitateEffect from "./PrecipitateEffect";
-import SmokeEffect from "./SmokeEffect";
+import CanvasBubbleEffect from "./CanvasBubbleEffect";
+import CanvasPrecipitateEffect from "./CanvasPrecipitateEffect";
+import CanvasSmokeEffect from "./CanvasSmokeEffect";
+import { getReagentById } from "../state/recipes/reagentIndex";
 import { PHASE_CONFIG } from "../constants/labConfig";
 
-function HeatGlow({ active, temperature }) {
+// ==================== 子组件 ====================
+
+const HeatGlow = React.memo(function HeatGlow({ active, temperature }) {
   if (!active) return null;
   const intensity = Math.min((temperature - 25) / 75, 1);
   return (
@@ -24,9 +38,9 @@ function HeatGlow({ active, temperature }) {
       transition={{ duration: 1.5, repeat: Infinity }}
     />
   );
-}
+});
 
-function ColorChangeGlow({ active, color }) {
+const ColorChangeGlow = React.memo(function ColorChangeGlow({ active, color }) {
   if (!active) return null;
   return (
     <motion.div
@@ -43,9 +57,9 @@ function ColorChangeGlow({ active, color }) {
       transition={{ duration: 1, repeat: Infinity }}
     />
   );
-}
+});
 
-function WavyLiquid({ color, level }) {
+const WavyLiquid = React.memo(function WavyLiquid({ color, level }) {
   return (
     <motion.div
       className="absolute bottom-0 left-0 right-0 z-1"
@@ -54,20 +68,16 @@ function WavyLiquid({ color, level }) {
       animate={{ height: `${level}%` }}
       transition={{ duration: 0.8, ease: "easeOut" }}
     >
-      {/* Liquid body */}
       <motion.div
         className="absolute inset-0"
         style={{
           background: `linear-gradient(180deg, ${color}cc, ${color})`,
           borderRadius: "0 0 inherit",
         }}
-        animate={{
-          background: `linear-gradient(180deg, ${color}cc, ${color})`,
-        }}
+        animate={{ background: `linear-gradient(180deg, ${color}cc, ${color})` }}
         transition={{ duration: 1.5 }}
       />
 
-      {/* Wavy top surface */}
       <svg
         className="absolute -top-2 left-0 w-full h-4 z-2"
         viewBox="0 0 200 10"
@@ -87,16 +97,14 @@ function WavyLiquid({ color, level }) {
         />
       </svg>
 
-      {/* Glass refraction */}
       <div className="absolute top-0 left-[8%] w-[15%] h-full bg-gradient-to-r from-white/[0.06] to-transparent z-3" />
     </motion.div>
   );
-}
+});
 
-function BeakerGlass() {
+const BeakerGlass = React.memo(function BeakerGlass() {
   return (
     <>
-      {/* Main beaker body */}
       <div
         className="absolute inset-0 rounded-2xl"
         style={{
@@ -107,8 +115,6 @@ function BeakerGlass() {
             "inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 0 rgba(0,0,0,0.05), 0 20px 40px -10px rgba(0,0,0,0.15), 0 0 60px rgba(56,189,248,0.08)",
         }}
       />
-
-      {/* Glass reflection - left */}
       <div
         className="absolute top-[5%] left-[6%] w-[12%] h-[60%] rounded-full z-20"
         style={{
@@ -116,16 +122,12 @@ function BeakerGlass() {
           filter: "blur(1px)",
         }}
       />
-
-      {/* Glass reflection - top rim */}
       <div
         className="absolute top-0 left-[10%] right-[10%] h-[2px] z-20"
         style={{
           background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent)",
         }}
       />
-
-      {/* Pour spout */}
       <div
         className="absolute -top-[6px] left-[20%] w-[8%] h-[12px] rounded-t-md z-10"
         style={{
@@ -134,8 +136,6 @@ function BeakerGlass() {
           borderBottom: "none",
         }}
       />
-
-      {/* Graduation marks */}
       {[25, 50, 75].map((mark) => (
         <div
           key={mark}
@@ -150,9 +150,9 @@ function BeakerGlass() {
       ))}
     </>
   );
-}
+});
 
-function EmptyState() {
+const EmptyState = React.memo(function EmptyState() {
   return (
     <motion.div
       className="absolute inset-0 flex flex-col items-center justify-center z-5"
@@ -182,14 +182,50 @@ function EmptyState() {
       </div>
     </motion.div>
   );
-}
+});
 
-// 试剂添加时的物相特效
-function PhaseAddEffect({ phase }) {
+// 固体块状物显示
+const SolidChunks = React.memo(function SolidChunks({ solidReagents }) {
+  if (!solidReagents || solidReagents.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-8 pointer-events-none">
+      <div className="flex flex-wrap justify-center gap-1 px-4 pb-1">
+        {solidReagents.map((r, i) => {
+          const hash = r.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+          const w = 12 + (hash % 10);
+          const h = 8 + (hash % 8);
+          const br = 2 + (hash % 4);
+          const rotate = -5 + (hash % 11);
+
+          return (
+            <motion.div
+              key={r.id}
+              initial={{ y: -30, opacity: 0, scale: 0.5 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.08, duration: 0.4, ease: "easeOut" }}
+              title={r.name}
+              style={{
+                width: `${w}px`,
+                height: `${h}px`,
+                backgroundColor: r.color,
+                borderRadius: `${br}px`,
+                transform: `rotate(${rotate}deg)`,
+                boxShadow: `inset 0 1px 2px rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.2)`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+// 物相添加特效
+const PhaseAddEffect = React.memo(function PhaseAddEffect({ phase }) {
   if (!phase) return null;
 
   if (phase === "solid") {
-    // 固体投入：从上方落入的小颗粒
     return (
       <motion.div
         className="absolute top-[15%] left-1/2 -translate-x-1/2 z-30 pointer-events-none"
@@ -219,7 +255,6 @@ function PhaseAddEffect({ phase }) {
   }
 
   if (phase === "gas") {
-    // 气体通入：冒出气泡
     return (
       <motion.div
         className="absolute bottom-[20%] left-1/2 -translate-x-1/2 z-30 pointer-events-none"
@@ -248,62 +283,33 @@ function PhaseAddEffect({ phase }) {
     );
   }
 
-  // liquid: 无额外特效
   return null;
-}
+});
 
-// 固体块状物显示
-function SolidChunks({ solidReagents }) {
-  if (!solidReagents || solidReagents.length === 0) return null;
+// ==================== 主组件 ====================
 
-  return (
-    <div className="absolute bottom-0 left-0 right-0 z-8 pointer-events-none">
-      <div className="flex flex-wrap justify-center gap-1 px-4 pb-1">
-        {solidReagents.map((r, i) => {
-          // 根据试剂ID生成确定性的大小和形状
-          const hash = r.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-          const w = 12 + (hash % 10);
-          const h = 8 + (hash % 8);
-          const br = 2 + (hash % 4);
-          const rotate = -5 + (hash % 11);
-
-          return (
-            <motion.div
-              key={r.id}
-              initial={{ y: -30, opacity: 0, scale: 0.5 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.08, duration: 0.4, ease: "easeOut" }}
-              title={r.name}
-              style={{
-                width: `${w}px`,
-                height: `${h}px`,
-                backgroundColor: r.color,
-                borderRadius: `${br}px`,
-                transform: `rotate(${rotate}deg)`,
-                boxShadow: `inset 0 1px 2px rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.2)`,
-              }}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export default function Beaker({ state, reagents: reagentList }) {
+const Beaker = React.memo(function Beaker({ state, reagents: reagentList }) {
   const { liquidColor, liquidLevel, effect, precipitateColor, isReacting, shakeIntensity, temperature } = state;
   const hasContents = state.beakerContents.length > 0;
 
-  // 用于追踪物相添加特效
   const [addPhase, setAddPhase] = useState(null);
   const prevContentsLenRef = useRef(state.beakerContents.length);
 
+  // 使用索引查找固体试剂 O(1) 替代 O(n)
+  const solidReagents = useMemo(() => {
+    if (!reagentList) return [];
+    return state.beakerContents
+      .map((id) => getReagentById(id))
+      .filter((r) => r && r.phase === "solid");
+  }, [state.beakerContents, reagentList]);
+
+  // 物相添加特效
   useEffect(() => {
     const prevLen = prevContentsLenRef.current;
     const curLen = state.beakerContents.length;
-    if (curLen > prevLen && reagentList) {
+    if (curLen > prevLen) {
       const lastId = state.beakerContents[curLen - 1];
-      const reagent = reagentList.find((r) => r.id === lastId);
+      const reagent = getReagentById(lastId);
       if (reagent && reagent.phase) {
         setAddPhase(reagent.phase);
         const timer = setTimeout(() => setAddPhase(null), 1500);
@@ -311,7 +317,7 @@ export default function Beaker({ state, reagents: reagentList }) {
       }
     }
     prevContentsLenRef.current = curLen;
-  }, [state.beakerContents, reagentList]);
+  }, [state.beakerContents]);
 
   return (
     <Droppable droppableId="beaker">
@@ -320,7 +326,7 @@ export default function Beaker({ state, reagents: reagentList }) {
           ref={provided.innerRef}
           {...provided.droppableProps}
           className="relative w-full max-w-[400px] mx-auto"
-          style={{ height: 'calc(100vh - 250px)', minHeight: '350px', maxHeight: '600px' }}
+          style={{ height: "calc(100vh - 250px)", minHeight: "350px", maxHeight: "600px" }}
           animate={
             shakeIntensity > 0
               ? {
@@ -331,7 +337,6 @@ export default function Beaker({ state, reagents: reagentList }) {
           }
           transition={{ duration: 0.4, ease: "easeInOut" }}
         >
-          {/* Outer glow when dragging over */}
           {snapshot.isDraggingOver && (
             <motion.div
               className="absolute -inset-4 rounded-3xl z-0"
@@ -348,43 +353,30 @@ export default function Beaker({ state, reagents: reagentList }) {
             />
           )}
 
-          {/* Beaker container */}
           <div className="relative w-full h-full rounded-2xl overflow-hidden z-10">
             <BeakerGlass />
             <HeatGlow active={effect === "heat"} temperature={temperature} />
             <ColorChangeGlow active={effect === "colorChange"} color={liquidColor} />
 
-            {/* Liquid */}
             <AnimatePresence>
-              {hasContents && (
-                <WavyLiquid color={liquidColor} level={liquidLevel} />
-              )}
+              {hasContents && <WavyLiquid color={liquidColor} level={liquidLevel} />}
             </AnimatePresence>
 
-            {/* Solid chunks */}
-            {reagentList && (
-              <SolidChunks
-                solidReagents={state.beakerContents
-                  .map((id) => reagentList.find((r) => r.id === id))
-                  .filter((r) => r && r.phase === "solid")}
-              />
-            )}
+            <SolidChunks solidReagents={solidReagents} />
 
-            {/* Effects layer - behind glass, above liquid */}
-            <BubbleEffect
+            {/* Canvas 特效 - 性能优化 */}
+            <CanvasBubbleEffect
               active={isReacting && (effect === "gas" || effect === "smoke")}
               intensity={temperature > 60 ? "high" : "normal"}
             />
-            <PrecipitateEffect
+            <CanvasPrecipitateEffect
               active={isReacting && effect === "precipitate"}
               color={precipitateColor}
             />
-            <SmokeEffect active={isReacting && effect === "smoke"} />
+            <CanvasSmokeEffect active={isReacting && effect === "smoke"} />
 
-            {/* Empty state */}
             {!hasContents && <EmptyState />}
 
-            {/* Phase add effect */}
             <AnimatePresence>
               {addPhase && <PhaseAddEffect phase={addPhase} />}
             </AnimatePresence>
@@ -395,4 +387,6 @@ export default function Beaker({ state, reagents: reagentList }) {
       )}
     </Droppable>
   );
-}
+});
+
+export default Beaker;

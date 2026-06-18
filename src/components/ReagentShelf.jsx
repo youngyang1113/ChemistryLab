@@ -1,14 +1,29 @@
-import { useState, useMemo, useCallback } from "react";
+/**
+ * ReagentShelf 组件 - 性能优化版
+ * 
+ * 优化点：
+ * 1. 使用索引系统，搜索性能从 O(n) 优化到 O(1)
+ * 2. 使用 Set 优化 beakerContents 检查，从 O(n) 到 O(1)
+ * 3. 使用 useCallback/useMemo 精准控制重渲染
+ * 4. 修复 useDebounce Hook 的错误用法
+ */
+
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { reagents, getReagentImage } from "../state/recipes";
-import { REAGENT_CATEGORIES, SEARCH, PHASE_CONFIG } from "../constants/labConfig";
+import { getReagentImage } from "../state/recipes";
+import {
+  searchReagents,
+  groupReagents,
+  createBeakerSet,
+} from "../state/recipes/reagentIndex";
+import { REAGENT_CATEGORIES, PHASE_CONFIG } from "../constants/labConfig";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 
-// 防抖 Hook
+// ==================== 防抖 Hook（修复版） ====================
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
-  useState(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
@@ -18,29 +33,41 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-function ReagentCard({ reagent, index, onClick, isInBeaker }) {
+// ==================== ReagentCard 组件 ====================
+
+const ReagentCard = React.memo(function ReagentCard({
+  reagent,
+  index,
+  onClick,
+  isInBeaker,
+}) {
   const categoryConfig = REAGENT_CATEGORIES[reagent.category] || {};
   const gradientClass = categoryConfig.color || "from-gray-100 to-gray-50";
   const phaseConfig = PHASE_CONFIG[reagent.phase] || PHASE_CONFIG.solid;
   const image = getReagentImage(reagent);
 
-  // 双击添加
-  const handleDoubleClick = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isInBeaker) {
-      onClick(reagent.id);
-    }
-  }, [onClick, reagent.id, isInBeaker]);
+  // 使用 useCallback 缓存事件处理函数
+  const handleDoubleClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isInBeaker) {
+        onClick(reagent.id);
+      }
+    },
+    [onClick, reagent.id, isInBeaker]
+  );
 
-  // 点击"+"按钮添加
-  const handleAddClick = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isInBeaker) {
-      onClick(reagent.id);
-    }
-  }, [onClick, reagent.id, isInBeaker]);
+  const handleAddClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isInBeaker) {
+        onClick(reagent.id);
+      }
+    },
+    [onClick, reagent.id, isInBeaker]
+  );
 
   return (
     <Draggable draggableId={reagent.id} index={index}>
@@ -62,7 +89,6 @@ function ReagentCard({ reagent, index, onClick, isInBeaker }) {
           `}
         >
           <div className="flex items-center gap-1.5">
-            {/* 试剂图片 */}
             <div className="text-base leading-none shrink-0 select-none">
               {image}
             </div>
@@ -77,14 +103,14 @@ function ReagentCard({ reagent, index, onClick, isInBeaker }) {
                 {reagent.formula}
               </div>
             </div>
-            {/* 物相徽章 */}
-            <div className={`text-[8px] px-0.5 py-0 rounded border shrink-0 ${phaseConfig.color}`}
-              title={phaseConfig.label}>
+            <div
+              className={`text-[8px] px-0.5 py-0 rounded border shrink-0 ${phaseConfig.color}`}
+              title={phaseConfig.label}
+            >
               {phaseConfig.icon}
             </div>
           </div>
 
-          {/* Add button */}
           {!isInBeaker && (
             <button
               onClick={handleAddClick}
@@ -94,8 +120,18 @@ function ReagentCard({ reagent, index, onClick, isInBeaker }) {
                 active:opacity-100 active:scale-95"
               title="点击添加"
             >
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <svg
+                className="w-2.5 h-2.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
             </button>
           )}
@@ -109,48 +145,39 @@ function ReagentCard({ reagent, index, onClick, isInBeaker }) {
       )}
     </Draggable>
   );
-}
+});
+
+// ==================== 主组件 ====================
 
 export default function ReagentShelf({ onAddReagent, beakerContents }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedPhase, setSelectedPhase] = useState("all");
 
-  // 搜索过滤
+  // 防抖搜索，避免每次输入都触发过滤
+  const debouncedQuery = useDebounce(searchQuery, 200);
+
+  // 创建 beakerContents 的 Set，优化查找性能 O(n) -> O(1)
+  const beakerSet = useMemo(
+    () => createBeakerSet(beakerContents),
+    [beakerContents]
+  );
+
+  // 使用索引系统进行搜索和筛选
   const filteredReagents = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    return reagents.filter((r) => {
-      // 分类筛选
-      if (selectedCategory !== "all" && r.category !== selectedCategory) {
-        return false;
-      }
-      // 物相筛选
-      if (selectedPhase !== "all" && r.phase !== selectedPhase) {
-        return false;
-      }
-      // 搜索筛选
-      if (query) {
-        return (
-          r.name.toLowerCase().includes(query) ||
-          r.formula.toLowerCase().includes(query) ||
-          r.id.toLowerCase().includes(query)
-        );
-      }
-      return true;
+    return searchReagents(debouncedQuery, {
+      category: selectedCategory,
+      phase: selectedPhase,
     });
-  }, [searchQuery, selectedCategory, selectedPhase]);
+  }, [debouncedQuery, selectedCategory, selectedPhase]);
 
-  // Group filtered reagents by category
-  const grouped = useMemo(() => {
-    const groups = {};
-    for (const r of filteredReagents) {
-      if (!groups[r.category]) groups[r.category] = [];
-      groups[r.category].push(r);
-    }
-    return groups;
-  }, [filteredReagents]);
+  // 分组
+  const grouped = useMemo(
+    () => groupReagents(filteredReagents),
+    [filteredReagents]
+  );
 
-  const categories = Object.keys(grouped);
+  const categories = useMemo(() => Object.keys(grouped), [grouped]);
 
   // 计算全局索引
   const reagentIndexMap = useMemo(() => {
@@ -165,6 +192,7 @@ export default function ReagentShelf({ onAddReagent, beakerContents }) {
     return map;
   }, [grouped]);
 
+  // 使用 useCallback 缓存事件处理函数
   const handleSearchChange = useCallback((e) => {
     setSearchQuery(e.target.value);
   }, []);
@@ -172,6 +200,20 @@ export default function ReagentShelf({ onAddReagent, beakerContents }) {
   const handleCategoryClick = useCallback((cat) => {
     setSelectedCategory((prev) => (prev === cat ? "all" : cat));
   }, []);
+
+  const handlePhaseClick = useCallback((phase) => {
+    setSelectedPhase((prev) => (prev === phase ? "all" : phase));
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+  }, []);
+
+  // 使用 Set 检查是否在烧杯中 O(1)
+  const isReagentInBeaker = useCallback(
+    (reagentId) => beakerSet.has(reagentId),
+    [beakerSet]
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -211,11 +253,21 @@ export default function ReagentShelf({ onAddReagent, beakerContents }) {
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={clearSearch}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           )}
@@ -269,7 +321,7 @@ export default function ReagentShelf({ onAddReagent, beakerContents }) {
           {Object.entries(PHASE_CONFIG).map(([key, { label, icon }]) => (
             <button
               key={key}
-              onClick={() => setSelectedPhase((prev) => (prev === key ? "all" : key))}
+              onClick={() => handlePhaseClick(key)}
               className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
                 selectedPhase === key
                   ? "bg-teal-500 text-white"
@@ -292,8 +344,18 @@ export default function ReagentShelf({ onAddReagent, beakerContents }) {
           >
             {categories.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
-                <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  className="w-12 h-12 mx-auto mb-3 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
                 <p className="text-sm">未找到匹配的试剂</p>
                 <p className="text-xs mt-1">尝试其他搜索词或分类</p>
@@ -311,7 +373,7 @@ export default function ReagentShelf({ onAddReagent, beakerContents }) {
                         reagent={reagent}
                         index={reagentIndexMap.get(reagent.id) || 0}
                         onClick={onAddReagent}
-                        isInBeaker={beakerContents.includes(reagent.id)}
+                        isInBeaker={isReagentInBeaker(reagent.id)}
                       />
                     ))}
                   </div>
