@@ -13,6 +13,7 @@ import Beaker from "./components/Beaker";
 import DataDashboard from "./components/DataDashboard";
 import TeacherConsole from "./components/TeacherConsole";
 import AIExplanation from "./components/AIExplanation";
+import AIExperimentPanel from "./components/AIExperimentPanel";
 import { ToastContainer, toast } from "./components/Toast";
 import { reagents } from "./state/recipes";
 
@@ -47,7 +48,7 @@ function CursorGlow() {
   );
 }
 
-function Header({ onTeacherOpen, onAIOpen }) {
+function Header({ onTeacherOpen, onAIOpen, onAIExperimentOpen }) {
   return (
     <header className="h-14 flex items-center justify-between px-6 border-b border-gray-200 shrink-0 bg-white/80 backdrop-blur-sm">
       <div className="flex items-center gap-3">
@@ -64,6 +65,12 @@ function Header({ onTeacherOpen, onAIOpen }) {
       </div>
       <div className="flex items-center gap-2">
         <button
+          onClick={onAIExperimentOpen}
+          className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg text-xs font-medium hover:from-indigo-600 hover:to-purple-600 transition-all shadow-sm"
+        >
+          AI 实验引擎
+        </button>
+        <button
           onClick={onAIOpen}
           className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-xs font-medium hover:from-purple-600 hover:to-pink-600 transition-all shadow-sm"
         >
@@ -75,7 +82,7 @@ function Header({ onTeacherOpen, onAIOpen }) {
         >
           教师控制台
         </button>
-        <div className="text-[10px] text-gray-500 font-mono ml-2">v2.0</div>
+        <div className="text-[10px] text-gray-500 font-mono ml-2">v3.0</div>
         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
       </div>
     </header>
@@ -124,6 +131,9 @@ export default function App() {
   const showAI = useShowAIExplanation();
   const { openTeacherConsole, openAIExplanation, closeAIExplanation } = useUIStore();
 
+  // AI 实验面板状态
+  const [showAIExperiment, setShowAIExperiment] = useState(false);
+
   const handleDragEnd = useCallback(
     (result) => {
       if (!result.destination) return;
@@ -159,6 +169,7 @@ export default function App() {
         <Header
           onTeacherOpen={() => openTeacherConsole()}
           onAIOpen={() => showAI ? closeAIExplanation() : openAIExplanation()}
+          onAIExperimentOpen={() => setShowAIExperiment(!showAIExperiment)}
         />
 
         {/* Status banner */}
@@ -310,6 +321,16 @@ export default function App() {
           <AIExplanation
             reaction={state.currentReaction}
             onClose={() => closeAIExplanation()}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* AI Experiment Panel */}
+      <AnimatePresence>
+        {showAIExperiment && (
+          <AIExperimentPanel
+            state={state}
+            onClose={() => setShowAIExperiment(false)}
           />
         )}
       </AnimatePresence>
