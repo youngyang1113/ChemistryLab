@@ -110,3 +110,16 @@ export const EFFECTS = {
   SMOKE: "smoke",
   COLOR_CHANGE: "colorChange",
 };
+
+// ==================== 物相配置 ====================
+export const PHASE = {
+  SOLID: "solid",
+  LIQUID: "liquid",
+  GAS: "gas",
+};
+
+export const PHASE_CONFIG = {
+  solid: { label: "固体", icon: "🪨", color: "bg-stone-100 text-stone-600 border-stone-200" },
+  liquid: { label: "液体", icon: "💧", color: "bg-sky-100 text-sky-600 border-sky-200" },
+  gas: { label: "气体", icon: "💨", color: "bg-cyan-100 text-cyan-600 border-cyan-200" },
+};

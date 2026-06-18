@@ -1,13 +1,17 @@
 import { DragDropContext } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLabStore } from "./hooks/useLabStore";
+// 使用新的 V2 Hook，保持向后兼容
+import { useLabStoreV2 } from "./hooks/useLabStoreV2";
+// 旧的 Hook 保留作为备用
+// import { useLabStore } from "./hooks/useLabStore";
 import ReagentShelf from "./components/ReagentShelf";
 import Beaker from "./components/Beaker";
 import DataDashboard from "./components/DataDashboard";
 import TeacherConsole from "./components/TeacherConsole";
 import AIExplanation from "./components/AIExplanation";
 import { ToastContainer, toast } from "./components/Toast";
+import { reagents } from "./state/recipes";
 
 function CursorGlow() {
   const glowRef = useRef(null);
@@ -109,7 +113,8 @@ function StatusBanner({ reaction }) {
 }
 
 export default function App() {
-  const { state, addReagent, resetBeaker, undo, redo, canUndo, canRedo } = useLabStore();
+  // 使用新的 V2 Hook
+  const { state, addReagent, resetBeaker, undo, redo, canUndo, canRedo } = useLabStoreV2();
   const [showTeacher, setShowTeacher] = useState(false);
   const [showAI, setShowAI] = useState(false);
 
@@ -161,7 +166,7 @@ export default function App() {
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex-1 flex overflow-hidden">
             {/* Left: Reagent Shelf */}
-            <aside className="w-[260px] shrink-0 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
+            <aside className="w-[200px] shrink-0 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
               <ReagentShelf
                 onAddReagent={addReagent}
                 beakerContents={state.beakerContents}
@@ -246,7 +251,7 @@ export default function App() {
               </AnimatePresence>
 
               {/* The Beaker */}
-              <Beaker state={state} />
+              <Beaker state={state} reagents={reagents} />
 
               {/* Equation display below beaker */}
               <AnimatePresence>

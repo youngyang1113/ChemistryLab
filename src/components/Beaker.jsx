@@ -1,8 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Droppable } from "@hello-pangea/dnd";
+import { useState, useEffect, useRef } from "react";
 import BubbleEffect from "./BubbleEffect";
 import PrecipitateEffect from "./PrecipitateEffect";
 import SmokeEffect from "./SmokeEffect";
+import { PHASE_CONFIG } from "../constants/labConfig";
 
 function HeatGlow({ active, temperature }) {
   if (!active) return null;
@@ -170,13 +172,146 @@ function EmptyState() {
       </motion.div>
       <p className="text-xs text-gray-500 font-medium">拖放试剂到此处</p>
       <p className="text-[10px] text-gray-400 mt-0.5">或从左侧试剂架点击添加</p>
+      <div className="flex gap-3 mt-3">
+        {Object.entries(PHASE_CONFIG).map(([key, { label, icon }]) => (
+          <div key={key} className="text-[10px] text-gray-400 flex items-center gap-1">
+            <span>{icon}</span>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
     </motion.div>
   );
 }
 
-export default function Beaker({ state }) {
+// 试剂添加时的物相特效
+function PhaseAddEffect({ phase }) {
+  if (!phase) return null;
+
+  if (phase === "solid") {
+    // 固体投入：从上方落入的小颗粒
+    return (
+      <motion.div
+        className="absolute top-[15%] left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: 1.2 }}
+      >
+        {[...Array(5)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1.5 h-1.5 rounded-full bg-gray-400"
+            initial={{ x: (i - 2) * 12, y: 0, opacity: 1 }}
+            animate={{ y: 80, opacity: 0, x: (i - 2) * 18 }}
+            transition={{ duration: 0.8 + i * 0.1, ease: "easeIn" }}
+          />
+        ))}
+        <motion.div
+          className="text-[10px] text-gray-500 font-medium whitespace-nowrap"
+          initial={{ y: 0, opacity: 1 }}
+          animate={{ y: 30, opacity: 0 }}
+          transition={{ duration: 1 }}
+        >
+          🪨 固体投入
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  if (phase === "gas") {
+    // 气体通入：冒出气泡
+    return (
+      <motion.div
+        className="absolute bottom-[20%] left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: 1.5 }}
+      >
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 rounded-full border border-gray-300 bg-white/50"
+            initial={{ x: (i - 3) * 10, y: 0, opacity: 0.8, scale: 0.5 + Math.random() * 0.5 }}
+            animate={{ y: -60 - i * 15, opacity: 0, x: (i - 3) * 15 }}
+            transition={{ duration: 1 + i * 0.15, ease: "easeOut" }}
+          />
+        ))}
+        <motion.div
+          className="text-[10px] text-gray-500 font-medium whitespace-nowrap"
+          initial={{ y: 0, opacity: 1 }}
+          animate={{ y: -20, opacity: 0 }}
+          transition={{ duration: 1 }}
+        >
+          💨 气体通入
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // liquid: 无额外特效
+  return null;
+}
+
+// 固体块状物显示
+function SolidChunks({ solidReagents }) {
+  if (!solidReagents || solidReagents.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-8 pointer-events-none">
+      <div className="flex flex-wrap justify-center gap-1 px-4 pb-1">
+        {solidReagents.map((r, i) => {
+          // 根据试剂ID生成确定性的大小和形状
+          const hash = r.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+          const w = 12 + (hash % 10);
+          const h = 8 + (hash % 8);
+          const br = 2 + (hash % 4);
+          const rotate = -5 + (hash % 11);
+
+          return (
+            <motion.div
+              key={r.id}
+              initial={{ y: -30, opacity: 0, scale: 0.5 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.08, duration: 0.4, ease: "easeOut" }}
+              title={r.name}
+              style={{
+                width: `${w}px`,
+                height: `${h}px`,
+                backgroundColor: r.color,
+                borderRadius: `${br}px`,
+                transform: `rotate(${rotate}deg)`,
+                boxShadow: `inset 0 1px 2px rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.2)`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default function Beaker({ state, reagents: reagentList }) {
   const { liquidColor, liquidLevel, effect, precipitateColor, isReacting, shakeIntensity, temperature } = state;
   const hasContents = state.beakerContents.length > 0;
+
+  // 用于追踪物相添加特效
+  const [addPhase, setAddPhase] = useState(null);
+  const prevContentsLenRef = useRef(state.beakerContents.length);
+
+  useEffect(() => {
+    const prevLen = prevContentsLenRef.current;
+    const curLen = state.beakerContents.length;
+    if (curLen > prevLen && reagentList) {
+      const lastId = state.beakerContents[curLen - 1];
+      const reagent = reagentList.find((r) => r.id === lastId);
+      if (reagent && reagent.phase) {
+        setAddPhase(reagent.phase);
+        const timer = setTimeout(() => setAddPhase(null), 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevContentsLenRef.current = curLen;
+  }, [state.beakerContents, reagentList]);
 
   return (
     <Droppable droppableId="beaker">
@@ -226,6 +361,15 @@ export default function Beaker({ state }) {
               )}
             </AnimatePresence>
 
+            {/* Solid chunks */}
+            {reagentList && (
+              <SolidChunks
+                solidReagents={state.beakerContents
+                  .map((id) => reagentList.find((r) => r.id === id))
+                  .filter((r) => r && r.phase === "solid")}
+              />
+            )}
+
             {/* Effects layer - behind glass, above liquid */}
             <BubbleEffect
               active={isReacting && (effect === "gas" || effect === "smoke")}
@@ -239,6 +383,11 @@ export default function Beaker({ state }) {
 
             {/* Empty state */}
             {!hasContents && <EmptyState />}
+
+            {/* Phase add effect */}
+            <AnimatePresence>
+              {addPhase && <PhaseAddEffect phase={addPhase} />}
+            </AnimatePresence>
           </div>
 
           {provided.placeholder}

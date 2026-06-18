@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
+import { knowledgeCategories, knowledgeItems } from "./knowledgeData";
 
 export default function TeacherConsole({ state, isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -299,102 +300,8 @@ function KnowledgeBase() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const categories = [
-    { id: "all", label: "全部" },
-    { id: "acid-base", label: "酸碱反应" },
-    { id: "precipitation", label: "沉淀反应" },
-    { id: "redox", label: "氧化还原" },
-    { id: "decomposition", label: "分解反应" },
-    { id: "combination", label: "化合反应" },
-  ];
-
-  const knowledgeItems = [
-    {
-      category: "acid-base",
-      title: "酸碱中和反应",
-      content: "酸和碱反应生成盐和水的反应称为中和反应。强酸强碱完全中和时，溶液呈中性。",
-      examples: ["HCl + NaOH → NaCl + H₂O", "H₂SO₄ + 2KOH → K₂SO₄ + 2H₂O"],
-      keyPoints: ["放热反应", "pH趋向7", "生成盐和水"],
-    },
-    {
-      category: "acid-base",
-      title: "弱酸弱碱的电离",
-      content: "弱酸弱碱在水中部分电离，存在电离平衡。电离常数Ka/Kb越小，酸性/碱性越弱。",
-      examples: ["CH₃COOH ⇌ CH₃COO⁻ + H⁺", "NH₃·H₂O ⇌ NH₄⁺ + OH⁻"],
-      keyPoints: ["部分电离", "存在平衡", "温度影响电离"],
-    },
-    {
-      category: "precipitation",
-      title: "沉淀反应",
-      content: "两种电解质溶液反应生成难溶性物质的反应。沉淀的生成取决于溶度积常数Ksp。",
-      examples: ["AgNO₃ + NaCl → AgCl↓ + NaNO₃", "BaCl₂ + Na₂SO₄ → BaSO₄↓ + 2NaCl"],
-      keyPoints: ["离子浓度积>Ksp", "白色沉淀常见", "可用于离子检验"],
-    },
-    {
-      category: "precipitation",
-      title: "常见沉淀的颜色",
-      content: "AgCl(白色)、BaSO₄(白色)、CaCO₃(白色)、Cu(OH)₂(蓝色)、Fe(OH)₃(红褐色)、AgI(黄色)",
-      examples: ["Cu²⁺ + 2OH⁻ → Cu(OH)₂↓(蓝色)", "Fe³⁺ + 3OH⁻ → Fe(OH)₃↓(红褐色)"],
-      keyPoints: ["颜色可用于鉴别离子", "沉淀不溶于酸(除弱酸盐)"],
-    },
-    {
-      category: "redox",
-      title: "氧化还原反应",
-      content: "有电子转移(化合价变化)的反应。氧化剂得电子被还原，还原剂失电子被氧化。",
-      examples: ["Fe + CuSO₄ → FeSO₄ + Cu", "2Na + Cl₂ → 2NaCl"],
-      keyPoints: ["化合价变化", "电子转移", "升失氧还"],
-    },
-    {
-      category: "redox",
-      title: "原电池原理",
-      content: "将化学能转化为电能的装置。活泼金属作负极失电子，不活泼金属作正极得电子。",
-      examples: ["Zn-Cu原电池：Zn为负极，Cu为正极", "负极：Zn - 2e⁻ → Zn²⁺"],
-      keyPoints: ["负极氧化", "正极还原", "电子从负极流向正极"],
-    },
-    {
-      category: "decomposition",
-      title: "分解反应",
-      content: "一种化合物分解成两种或多种较简单物质的反应。AB → A + B",
-      examples: ["2H₂O₂ → 2H₂O + O₂↑", "CaCO₃ → CaO + CO₂↑"],
-      keyPoints: ["一变多", "需要条件(加热/催化剂)", "吸热或放热"],
-    },
-    {
-      category: "combination",
-      title: "化合反应",
-      content: "两种或多种物质生成一种新物质的反应。A + B → AB",
-      examples: ["2H₂ + O₂ → 2H₂O", "CaO + H₂O → Ca(OH)₂"],
-      keyPoints: ["多变一", "通常放热", "生成物只有一种"],
-    },
-    {
-      category: "acid-base",
-      title: "盐类水解",
-      content: "盐的离子与水电离出的H⁺或OH⁻结合生成弱电解质的反应。强酸弱碱盐水解呈酸性，强碱弱酸盐水解呈碱性。",
-      examples: ["NH₄Cl + H₂O ⇌ NH₃·H₂O + HCl", "CH₃COONa + H₂O ⇌ CH₃COOH + NaOH"],
-      keyPoints: ["谁弱谁水解", "越弱越水解", "盐类水解是吸热反应"],
-    },
-    {
-      category: "redox",
-      title: "电解原理",
-      content: "将电能转化为化学能的装置。阳极发生氧化反应，阴极发生还原反应。",
-      examples: ["电解水：2H₂O → 2H₂↑ + O₂↑", "电解CuCl₂：CuCl₂ → Cu + Cl₂↑"],
-      keyPoints: ["阳极氧化", "阴极还原", "与原电池相反"],
-    },
-    {
-      category: "precipitation",
-      title: "离子检验",
-      content: "利用特征反应检验溶液中的离子。Cl⁻用AgNO₃，SO₄²⁻用BaCl₂，NH₄⁺用NaOH加热。",
-      examples: ["Cl⁻ + Ag⁺ → AgCl↓(白色，不溶于HNO₃)", "SO₄²⁻ + Ba²⁺ → BaSO₄↓(白色)"],
-      keyPoints: ["特征沉淀", "排除干扰离子", "配合酸碱检验"],
-    },
-    {
-      category: "acid-base",
-      title: "酸碱指示剂",
-      content: "能随溶液pH变化而改变颜色的物质。石蕊：酸红碱蓝；酚酞：酸无碱红。",
-      examples: ["石蕊试液遇酸变红", "酚酞遇碱变红"],
-      keyPoints: ["变色范围不同", "可用于判断酸碱性", "不能用于判断pH具体值"],
-    },
-  ];
-
+  const categories = knowledgeCategories;
+  // knowledgeItems imported from knowledgeData.js
   const filteredItems = knowledgeItems.filter((item) => {
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
     const matchesSearch =
@@ -436,7 +343,7 @@ function KnowledgeBase() {
             <summary className="p-4 cursor-pointer hover:bg-gray-100 transition-colors">
               <div className="flex items-center gap-3">
                 <span className="text-lg">
-                  {item.category === "acid-base" ? "⚗️" : item.category === "precipitation" ? "💧" : item.category === "redox" ? "⚡" : "🔬"}
+                  {item.category === "acid-base" ? "⚗️" : item.category === "precipitation" ? "💧" : item.category === "redox" ? "⚡" : item.category === "displacement" ? "🔄" : item.category === "decomposition" ? "💥" : item.category === "combination" ? "🔗" : item.category === "gas" ? "💨" : item.category === "oxide" ? "🫧" : item.category === "indicator" ? "🎨" : item.category === "industrial" ? "🏭" : item.category === "organic" ? "🧬" : item.category === "iontest" ? "🔍" : "🔬"}
                 </span>
                 <div>
                   <h4 className="font-medium text-gray-900">{item.title}</h4>

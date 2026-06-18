@@ -4,7 +4,21 @@
 import { REACTION_TYPES } from "../../constants/labConfig";
 
 // 试剂定义
-export { reagents } from "./reagents";
+export { reagents, getReagentImage } from "./reagents";
+
+// 补充反应
+import {
+  indicatorRecipes,
+  metalWaterRecipes,
+  amphotericRecipes,
+  ionTestRecipes,
+  nonmetalOxideRecipes,
+  ironCopperRecipes,
+  industrialRecipes,
+  organicRecipes,
+  moreRedoxRecipes,
+  morePrecipitateRecipes,
+} from "./supplementRecipes";
 
 // ==================== 酸碱中和反应 ====================
 const acidBaseRecipes = {
@@ -1247,6 +1261,16 @@ export const reactionRecipes = {
   ...decompositionRecipes,
   ...sodiumRecipes,
   ...ternaryRecipes,
+  ...indicatorRecipes,
+  ...metalWaterRecipes,
+  ...amphotericRecipes,
+  ...ionTestRecipes,
+  ...nonmetalOxideRecipes,
+  ...ironCopperRecipes,
+  ...industrialRecipes,
+  ...organicRecipes,
+  ...moreRedoxRecipes,
+  ...morePrecipitateRecipes,
 };
 
 // ==================== 反应索引（用于快速匹配） ====================
