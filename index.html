@@ -11,8 +11,11 @@
   </head>
   <body class="bg-zinc-950 text-zinc-100 antialiased overflow-hidden">
     <div id="root">
-      <div id="fallback" style="display:flex;align-items:center;justify-content:center;height:100vh;color:#a1a1aa;font-family:sans-serif;font-size:14px;flex-direction:column;gap:8px;text-align:center;padding:20px">
-        <div>Loading AI Virtual Chemistry Lab...</div>
+      <div id="fallback" style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;color:#6b7280;font-family:Inter,system-ui,sans-serif;font-size:14px;flex-direction:column;gap:12px;text-align:center;padding:20px">
+        <div style="width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite"></div>
+        <div style="font-weight:500;color:#374151">正在加载 AI 虚拟化学实验室...</div>
+        <div style="font-size:12px;color:#9ca3af">请稍候</div>
+        <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
       </div>
     </div>
     <script type="module" src="/src/main.jsx"></script>
