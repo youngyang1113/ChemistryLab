@@ -18,6 +18,7 @@ import useReactionStore from "./useReactionStore";
 import useUIStore from "./useUIStore";
 import useHistoryStore from "./useHistoryStore";
 import { ANIMATION } from "../constants/labConfig";
+import { getReagentById } from "../state/recipes/reagentIndex";
 
 /**
  * 统一实验室 Hook
@@ -44,24 +45,33 @@ export function useLabStore() {
     const snapshot = historyStore.createSnapshot(beakerStore, reactionStore);
     historyStore.push(snapshot);
 
-    // 2. 尝试添加试剂
+    // 2. 记录添加前的状态
+    const isFirstReagent = beakerStore.beakerContents.length === 0;
+
+    // 3. 尝试添加试剂
     const added = beakerStore.addReagent(reagentId);
     if (!added) return; // 重复试剂
 
-    // 3. 如果是第一个试剂，只增加液位
-    if (beakerStore.beakerContents.length === 0) {
-      beakerStore.increaseLiquidLevel(8);
+    // 4. 获取试剂信息
+    const reagent = getReagentById(reagentId);
+
+    // 5. 如果是第一个试剂，设置液位和颜色
+    if (isFirstReagent) {
+      if (reagent && (reagent.phase === "liquid" || reagent.phase === "aqueous")) {
+        beakerStore.increaseLiquidLevel(8);
+        beakerStore.setLiquidColor(reagent.color);
+      }
       return;
     }
 
-    // 4. 尝试反应
+    // 5. 尝试反应
     const reaction = reactionStore.findReaction(
       beakerStore.beakerContents.slice(0, -1), // 已有的试剂
       reagentId // 新试剂
     );
 
     if (reaction) {
-      // 5a. 发生反应
+      // 6a. 发生反应
       const shakeIntensity = reactionStore.calculateShakeIntensity(
         reaction.tempDelta
       );
@@ -99,8 +109,11 @@ export function useLabStore() {
         completeReaction();
       }, ANIMATION.REACTION_DURATION);
     } else {
-      // 5b. 没有反应
-      beakerStore.increaseLiquidLevel(8);
+      // 6b. 没有反应 - 液体试剂增加液位并设色，固体不改变液位
+      if (reagent && (reagent.phase === "liquid" || reagent.phase === "aqueous")) {
+        beakerStore.increaseLiquidLevel(8);
+        beakerStore.setLiquidColor(reagent.color);
+      }
     }
   }, [beakerStore, reactionStore, historyStore]);
 

@@ -1,6 +1,6 @@
 import { DragDropContext } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense, Component } from "react";
 // 使用新的 V3 Store（基于 Zustand）
 import { useLabStore } from "./stores/useLabStore";
 // 子 Store 可以按需直接导入以获得更好的性能
@@ -16,6 +16,24 @@ import AIExplanation from "./components/AIExplanation";
 import AIExperimentPanel from "./components/AIExperimentPanel";
 import { ToastContainer, toast } from "./components/Toast";
 import { reagents } from "./state/recipes";
+
+// 3D 场景延迟加载，避免阻塞首屏
+const LazyScene3D = React.lazy(() =>
+  import("./components/scene3d/Scene3D").catch(() => ({
+    default: () => <div className="w-full h-full flex items-center justify-center text-gray-400">3D 场景加载失败</div>,
+  }))
+);
+
+function Scene3DFallback() {
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="text-gray-400 text-xs">加载 3D 场景...</div>
+      </div>
+    </div>
+  );
+}
 
 function CursorGlow() {
   const glowRef = useRef(null);
@@ -134,6 +152,9 @@ export default function App() {
   // AI 实验面板状态
   const [showAIExperiment, setShowAIExperiment] = useState(false);
 
+  // 2D/3D 视图切换
+  const [viewMode, setViewMode] = useState("2d"); // "2d" | "3d"
+
   const handleDragEnd = useCallback(
     (result) => {
       if (!result.destination) return;
@@ -183,7 +204,7 @@ export default function App() {
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex-1 flex overflow-hidden">
             {/* Left: Reagent Shelf */}
-            <aside className="w-[200px] shrink-0 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
+            <aside className="w-[160px] shrink-0 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
               <ReagentShelf
                 onAddReagent={addReagent}
                 beakerContents={state.beakerContents}
@@ -194,6 +215,24 @@ export default function App() {
             <main className="flex-1 flex flex-col items-center justify-center relative p-8" style={{ background: "radial-gradient(ellipse at 50% 40%, rgba(219,234,254,0.4) 0%, transparent 70%)" }}>
               {/* Control buttons */}
               <div className="absolute top-6 right-6 flex items-center gap-2">
+                {/* 2D/3D 切换按钮 */}
+                <motion.button
+                  onClick={() => setViewMode(viewMode === "2d" ? "3d" : "2d")}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="text-[11px] font-medium glass-light rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 border border-indigo-200"
+                  title={viewMode === "2d" ? "切换到 3D 视图" : "切换到 2D 视图"}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {viewMode === "2d" ? (
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    ) : (
+                      <path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18" />
+                    )}
+                  </svg>
+                  {viewMode === "2d" ? "3D" : "2D"}
+                </motion.button>
+
                 {/* Undo button */}
                 <motion.button
                   onClick={undo}
@@ -267,8 +306,16 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              {/* The Beaker */}
-              <Beaker state={state} reagents={reagents} />
+              {/* The Beaker - 2D or 3D */}
+              {viewMode === "2d" ? (
+                <Beaker state={state} reagents={reagents} />
+              ) : (
+                <div className="w-full max-w-2xl mx-auto" style={{ height: 450 }}>
+                  <Suspense fallback={<Scene3DFallback />}>
+                    <LazyScene3D state={state} />
+                  </Suspense>
+                </div>
+              )}
 
               {/* Equation display below beaker */}
               <AnimatePresence>
@@ -279,10 +326,17 @@ export default function App() {
                     exit={{ opacity: 0, y: 10 }}
                     className="mt-6 text-center"
                   >
-                    <div className="text-xs font-mono text-gray-600 bg-white/80 rounded-lg px-4 py-2 border border-gray-200 shadow-sm">
+                    <div className="text-sm font-bold font-mono px-5 py-2.5 rounded-xl shadow-md"
+                      style={{
+                        color: state.currentReaction.color,
+                        background: `${state.currentReaction.color}12`,
+                        border: `2px solid ${state.currentReaction.color}50`,
+                        textShadow: `0 0 12px ${state.currentReaction.color}40`,
+                      }}
+                    >
                       {state.currentReaction.equation}
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-1.5 max-w-xs">
+                    <p className="text-[11px] text-gray-600 font-medium mt-2 max-w-sm mx-auto">
                       {state.currentReaction.description}
                     </p>
                     <button

@@ -70,7 +70,7 @@ export const STORAGE = {
 
 // ==================== 默认颜色 ====================
 export const DEFAULT_COLORS = {
-  LIQUID: "#1e293b",       // 默认液体颜色
+  LIQUID: "#d0e0f0",       // 默认液体颜色 (近无色，模拟纯水)
   PRECIPITATE: "#f5f5f4",  // 默认沉淀颜色
 };
 
@@ -119,7 +119,7 @@ export const PHASE = {
 };
 
 export const PHASE_CONFIG = {
-  solid: { label: "固体", icon: "🪨", color: "bg-stone-100 text-stone-600 border-stone-200" },
-  liquid: { label: "液体", icon: "💧", color: "bg-sky-100 text-sky-600 border-sky-200" },
-  gas: { label: "气体", icon: "💨", color: "bg-cyan-100 text-cyan-600 border-cyan-200" },
+  solid:   { label: "固体", icon: "▪", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  liquid:  { label: "液体", icon: "●", color: "bg-blue-100 text-blue-700 border-blue-300" },
+  gas:     { label: "气体", icon: "○", color: "bg-violet-100 text-violet-700 border-violet-300" },
 };

@@ -8,7 +8,7 @@
  * 4. 修复 useDebounce Hook 的错误用法
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getReagentImage } from "../state/recipes";
 import {
@@ -77,11 +77,11 @@ const ReagentCard = React.memo(function ReagentCard({
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={handleDoubleClick}
-          whileHover={{ scale: 1.02, y: -1 }}
+          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className={`
             relative cursor-grab active:cursor-grabbing select-none
-            rounded-lg p-2 transition-all duration-200
+            rounded-lg p-2.5 transition-all duration-200
             bg-gradient-to-br ${gradientClass}
             border border-gray-200
             ${snapshot.isDragging ? "ring-2 ring-blue-400 shadow-lg shadow-blue-500/20" : ""}
@@ -89,25 +89,22 @@ const ReagentCard = React.memo(function ReagentCard({
           `}
         >
           <div className="flex items-center gap-1.5">
-            <div className="text-base leading-none shrink-0 select-none">
+            <div className="text-lg leading-none shrink-0 select-none">
               {image}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-semibold text-gray-800 leading-tight truncate">
+              <div className="text-[11px] font-semibold text-gray-800 leading-tight truncate">
                 {reagent.name}
               </div>
-              <div
-                className="text-[9px] font-mono font-medium opacity-80 truncate"
-                style={{ color: reagent.color }}
-              >
+              <div className="text-[10px] font-mono font-bold text-indigo-600 truncate">
                 {reagent.formula}
               </div>
             </div>
             <div
-              className={`text-[8px] px-0.5 py-0 rounded border shrink-0 ${phaseConfig.color}`}
+              className={`text-[8px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ${phaseConfig.color}`}
               title={phaseConfig.label}
             >
-              {phaseConfig.icon}
+              {reagent.phase === "solid" ? "固" : reagent.phase === "liquid" || reagent.phase === "aqueous" ? "液" : "气"}
             </div>
           </div>
 

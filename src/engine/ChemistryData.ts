@@ -1,0 +1,438 @@
+import type { Material, ReactionRule } from "./types";
+import { registerMaterial } from "./MaterialState";
+import { createReactionRule } from "./RuleEngine";
+
+// ==================== 注册所有物质 ====================
+
+const MATERIALS: Material[] = [
+  // 酸 (无色透明液体)
+  { id: "HCl", name: "盐酸", formula: "HCl", phase: "aqueous", color: "#dce8f0" },
+  { id: "H2SO4", name: "硫酸", formula: "H₂SO₄", phase: "liquid", color: "#e8dcc8" },
+  { id: "HNO3", name: "硝酸", formula: "HNO₃", phase: "liquid", color: "#e8e0c8" },
+  { id: "CH3COOH", name: "醋酸", formula: "CH₃COOH", phase: "liquid", color: "#ece4d0" },
+  { id: "HF", name: "氢氟酸", formula: "HF", phase: "liquid", color: "#e0e8ec" },
+
+  // 碱 (白色固体)
+  { id: "NaOH", name: "氢氧化钠", formula: "NaOH", phase: "solid", color: "#f0ede8", meltingPoint: 318 },
+  { id: "KOH", name: "氢氧化钾", formula: "KOH", phase: "solid", color: "#f0ede8", meltingPoint: 360 },
+  { id: "Ca(OH)2", name: "氢氧化钙", formula: "Ca(OH)₂", phase: "solid", color: "#f5f2ec" },
+  { id: "Ba(OH)2", name: "氢氧化钡", formula: "Ba(OH)₂", phase: "solid", color: "#f0ede8" },
+  { id: "NH3H2O", name: "氨水", formula: "NH₃·H₂O", phase: "liquid", color: "#dce8ec" },
+  { id: "Fe(OH)3", name: "氢氧化铁", formula: "Fe(OH)₃", phase: "solid", color: "#8b4513" },
+  { id: "Cu(OH)2", name: "氢氧化铜", formula: "Cu(OH)₂", phase: "solid", color: "#4169e1" },
+  { id: "Al(OH)3", name: "氢氧化铝", formula: "Al(OH)₃", phase: "solid", color: "#f0ede8" },
+
+  // 盐 (白色固体为主)
+  { id: "NaCl", name: "氯化钠", formula: "NaCl", phase: "solid", color: "#f8f6f0" },
+  { id: "Na2CO3", name: "碳酸钠", formula: "Na₂CO₃", phase: "solid", color: "#f5f2ec" },
+  { id: "NaHCO3", name: "碳酸氢钠", formula: "NaHCO₃", phase: "solid", color: "#f8f6f0" },
+  { id: "CaCO3", name: "碳酸钙", formula: "CaCO₃", phase: "solid", color: "#f0ede8" },
+  { id: "AgNO3", name: "硝酸银", formula: "AgNO₃", phase: "solid", color: "#f0ede8" },
+  { id: "BaCl2", name: "氯化钡", formula: "BaCl₂", phase: "solid", color: "#f0ede8" },
+  { id: "CuSO4", name: "硫酸铜", formula: "CuSO₄", phase: "solid", color: "#5b9ec9" },
+  { id: "FeCl3", name: "氯化铁", formula: "FeCl₃", phase: "solid", color: "#a07828" },
+  { id: "FeSO4", name: "硫酸亚铁", formula: "FeSO₄", phase: "solid", color: "#7db87d" },
+  { id: "KI", name: "碘化钾", formula: "KI", phase: "solid", color: "#f0ede8" },
+  { id: "KSCN", name: "硫氰化钾", formula: "KSCN", phase: "solid", color: "#f0ede8" },
+  { id: "KMnO4", name: "高锰酸钾", formula: "KMnO₄", phase: "solid", color: "#6b21a8" },
+  { id: "NH4Cl", name: "氯化铵", formula: "NH₄Cl", phase: "solid", color: "#f0ede8" },
+  { id: "Na2S", name: "硫化钠", formula: "Na₂S", phase: "solid", color: "#f0ede8" },
+  { id: "Na2SiO3", name: "硅酸钠", formula: "Na₂SiO₃", phase: "solid", color: "#f0ede8" },
+  { id: "Pb(NO3)2", name: "硝酸铅", formula: "Pb(NO₃)₂", phase: "solid", color: "#f0ede8" },
+
+  // 金属 (银白/紫红)
+  { id: "Na", name: "钠", formula: "Na", phase: "solid", color: "#c0c0c0", meltingPoint: 98 },
+  { id: "Mg", name: "镁", formula: "Mg", phase: "solid", color: "#d0d0d0", meltingPoint: 650 },
+  { id: "Al", name: "铝", formula: "Al", phase: "solid", color: "#c8c8c8", meltingPoint: 660 },
+  { id: "Fe", name: "铁", formula: "Fe", phase: "solid", color: "#707070", meltingPoint: 1538 },
+  { id: "Zn", name: "锌", formula: "Zn", phase: "solid", color: "#a8b0b8", meltingPoint: 420 },
+  { id: "Cu", name: "铜", formula: "Cu", phase: "solid", color: "#b87333", meltingPoint: 1085 },
+
+  // 氧化物
+  { id: "CuO", name: "氧化铜", formula: "CuO", phase: "solid", color: "#1a1a1a" },
+  { id: "Fe2O3", name: "氧化铁", formula: "Fe₂O₃", phase: "solid", color: "#8b2500" },
+  { id: "CaO", name: "氧化钙", formula: "CaO", phase: "solid", color: "#f0ede8" },
+  { id: "Na2O", name: "氧化钠", formula: "Na₂O", phase: "solid", color: "#f0ede8" },
+  { id: "Na2O2", name: "过氧化钠", formula: "Na₂O₂", phase: "solid", color: "#e0d080" },
+  { id: "MgO", name: "氧化镁", formula: "MgO", phase: "solid", color: "#f0ede8" },
+  { id: "SiO2", name: "二氧化硅", formula: "SiO₂", phase: "solid", color: "#e8e4dc" },
+
+  // 气体 (无色/黄绿/红棕)
+  { id: "CO2", name: "二氧化碳", formula: "CO₂", phase: "gas", color: "#d0d8dc", boilingPoint: -78 },
+  { id: "SO2", name: "二氧化硫", formula: "SO₂", phase: "gas", color: "#d0d8dc", boilingPoint: -10 },
+  { id: "Cl2", name: "氯气", formula: "Cl₂", phase: "gas", color: "#a8c830", boilingPoint: -34 },
+  { id: "H2", name: "氢气", formula: "H₂", phase: "gas", color: "#dce0e4", boilingPoint: -253 },
+  { id: "O2", name: "氧气", formula: "O₂", phase: "gas", color: "#c8d8e8", boilingPoint: -183 },
+  { id: "NH3", name: "氨气", formula: "NH₃", phase: "gas", color: "#d0dce0", boilingPoint: -33 },
+  { id: "NO2", name: "二氧化氮", formula: "NO₂", phase: "gas", color: "#8b4513", boilingPoint: 21 },
+
+  // 液体
+  { id: "H2O", name: "水", formula: "H₂O", phase: "liquid", color: "#d0e0f0", meltingPoint: 0, boilingPoint: 100 },
+  { id: "H2O2", name: "双氧水", formula: "H₂O₂", phase: "liquid", color: "#d8e4f0" },
+
+  // 指示剂
+  { id: "phenolphthalein", name: "酚酞", formula: "C₂₀H₁₄O₄", phase: "liquid", color: "#e8e0d8" },
+  { id: "litmus", name: "石蕊", formula: "Litmus", phase: "liquid", color: "#7040a0" },
+  { id: "methyl_orange", name: "甲基橙", formula: "C₁₄H₁₄N₃NaO₃S", phase: "liquid", color: "#d08020" },
+
+  // 非金属
+  { id: "C", name: "碳", formula: "C", phase: "solid", color: "#1a1a1a", meltingPoint: 3550 },
+  { id: "S", name: "硫", formula: "S", phase: "solid", color: "#e8c820", meltingPoint: 115 },
+  { id: "I2", name: "碘", formula: "I₂", phase: "solid", color: "#2d1a4e", meltingPoint: 114 },
+  { id: "MnO2", name: "二氧化锰", formula: "MnO₂", phase: "solid", color: "#1a1a1a" },
+];
+
+export function initMaterials(): void {
+  for (const m of MATERIALS) registerMaterial(m);
+}
+
+// ==================== 反应规则 ====================
+
+export const REACTION_RULES: ReactionRule[] = [
+  // ---------- 酸碱中和 ----------
+  createReactionRule({
+    id: "HCl+NaOH",
+    name: "盐酸与氢氧化钠中和",
+    type: "neutralization",
+    reactants: [{ materialId: "HCl", stoichiometry: 1 }, { materialId: "NaOH", stoichiometry: 1 }],
+    products: [{ materialId: "NaCl", stoichiometry: 1, phase: "aqueous" }, { materialId: "H2O", stoichiometry: 1, phase: "liquid" }],
+    conditions: [],
+    effects: ["heat_glow"],
+    equation: "HCl + NaOH → NaCl + H₂O",
+    description: "强酸强碱中和，放热明显",
+    tempDelta: 15,
+    phChange: 0,
+    priority: 10,
+  }),
+  createReactionRule({
+    id: "H2SO4+NaOH",
+    name: "硫酸与氢氧化钠中和",
+    type: "neutralization",
+    reactants: [{ materialId: "H2SO4", stoichiometry: 1 }, { materialId: "NaOH", stoichiometry: 2 }],
+    products: [{ materialId: "NaCl", stoichiometry: 1, phase: "aqueous" }, { materialId: "H2O", stoichiometry: 2, phase: "liquid" }],
+    conditions: [],
+    effects: ["heat_glow"],
+    equation: "H₂SO₄ + 2NaOH → Na₂SO₄ + 2H₂O",
+    description: "硫酸与氢氧化钠中和",
+    tempDelta: 18,
+    phChange: 0,
+    priority: 10,
+  }),
+  createReactionRule({
+    id: "HCl+NH3H2O",
+    name: "盐酸与氨水中和",
+    type: "neutralization",
+    reactants: [{ materialId: "HCl", stoichiometry: 1 }, { materialId: "NH3H2O", stoichiometry: 1 }],
+    products: [{ materialId: "NH4Cl", stoichiometry: 1, phase: "aqueous" }, { materialId: "H2O", stoichiometry: 1, phase: "liquid" }],
+    conditions: [],
+    effects: ["heat_glow"],
+    equation: "HCl + NH₃·H₂O → NH₄Cl + H₂O",
+    description: "强酸弱碱中和",
+    tempDelta: 10,
+    phChange: -1,
+    priority: 10,
+  }),
+
+  // ---------- 产气反应 ----------
+  createReactionRule({
+    id: "HCl+Na2CO3",
+    name: "盐酸与碳酸钠反应",
+    type: "gas_production",
+    reactants: [{ materialId: "HCl", stoichiometry: 2 }, { materialId: "Na2CO3", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 2, phase: "aqueous" },
+      { materialId: "H2O", stoichiometry: 1, phase: "liquid" },
+      { materialId: "CO2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [],
+    effects: ["bubble"],
+    equation: "2HCl + Na₂CO₃ → 2NaCl + H₂O + CO₂↑",
+    description: "盐酸与碳酸钠反应产生二氧化碳",
+    tempDelta: -3,
+    phChange: 2,
+    priority: 8,
+  }),
+  createReactionRule({
+    id: "HCl+CaCO3",
+    name: "盐酸与碳酸钙反应",
+    type: "gas_production",
+    reactants: [{ materialId: "HCl", stoichiometry: 2 }, { materialId: "CaCO3", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "H2O", stoichiometry: 1, phase: "liquid" },
+      { materialId: "CO2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [],
+    effects: ["bubble"],
+    equation: "2HCl + CaCO₃ → CaCl₂ + H₂O + CO₂↑",
+    description: "盐酸溶解碳酸钙产生气泡",
+    tempDelta: 5,
+    phChange: 2,
+    priority: 8,
+  }),
+  createReactionRule({
+    id: "NH4Cl+NaOH",
+    name: "氯化铵与氢氧化钠反应",
+    type: "gas_production",
+    reactants: [{ materialId: "NH4Cl", stoichiometry: 1 }, { materialId: "NaOH", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "H2O", stoichiometry: 1, phase: "liquid" },
+      { materialId: "NH3", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [{ type: "temperature", operator: "gte", value: 80 }],
+    effects: ["bubble"],
+    equation: "NH₄Cl + NaOH →(加热) NaCl + H₂O + NH₃↑",
+    description: "铵盐与碱加热产生氨气",
+    tempDelta: 15,
+    phChange: 2,
+    priority: 7,
+  }),
+
+  // ---------- 沉淀反应 ----------
+  createReactionRule({
+    id: "AgNO3+NaCl",
+    name: "硝酸银与氯化钠反应",
+    type: "precipitation",
+    reactants: [{ materialId: "AgNO3", stoichiometry: 1 }, { materialId: "NaCl", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "AgCl", stoichiometry: 1, phase: "solid", color: "#f8fafc" },
+    ],
+    conditions: [],
+    effects: ["precipitate"],
+    equation: "AgNO₃ + NaCl → AgCl↓ + NaNO₃",
+    description: "生成白色氯化银沉淀（检验氯离子）",
+    tempDelta: 0,
+    phChange: 0,
+    priority: 9,
+  }),
+  createReactionRule({
+    id: "BaCl2+Na2SO4",
+    name: "氯化钡与硫酸钠反应",
+    type: "precipitation",
+    reactants: [{ materialId: "BaCl2", stoichiometry: 1 }, { materialId: "Na2CO3", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 2, phase: "aqueous" },
+      { materialId: "CaCO3", stoichiometry: 1, phase: "solid", color: "#f8fafc" },
+    ],
+    conditions: [],
+    effects: ["precipitate"],
+    equation: "BaCl₂ + Na₂SO₄ → BaSO₄↓ + 2NaCl",
+    description: "生成白色硫酸钡沉淀",
+    tempDelta: 0,
+    phChange: 0,
+    priority: 9,
+  }),
+  createReactionRule({
+    id: "CuSO4+NaOH",
+    name: "硫酸铜与氢氧化钠反应",
+    type: "precipitation",
+    reactants: [{ materialId: "CuSO4", stoichiometry: 1 }, { materialId: "NaOH", stoichiometry: 2 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "Cu(OH)2", stoichiometry: 1, phase: "solid", color: "#0ea5e9" },
+    ],
+    conditions: [],
+    effects: ["precipitate"],
+    equation: "CuSO₄ + 2NaOH → Cu(OH)₂↓ + Na₂SO₄",
+    description: "生成蓝色氢氧化铜沉淀",
+    tempDelta: 2,
+    phChange: 1,
+    priority: 9,
+  }),
+  createReactionRule({
+    id: "FeCl3+NaOH",
+    name: "氯化铁与氢氧化钠反应",
+    type: "precipitation",
+    reactants: [{ materialId: "FeCl3", stoichiometry: 1 }, { materialId: "NaOH", stoichiometry: 3 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 3, phase: "aqueous" },
+      { materialId: "Fe(OH)3", stoichiometry: 1, phase: "solid", color: "#b45309" },
+    ],
+    conditions: [],
+    effects: ["precipitate"],
+    equation: "FeCl₃ + 3NaOH → Fe(OH)₃↓ + 3NaCl",
+    description: "生成红褐色氢氧化铁沉淀",
+    tempDelta: 3,
+    phChange: 1,
+    priority: 9,
+  }),
+
+  // ---------- 置换反应 ----------
+  createReactionRule({
+    id: "HCl+Mg",
+    name: "镁与盐酸反应",
+    type: "displacement",
+    reactants: [{ materialId: "HCl", stoichiometry: 2 }, { materialId: "Mg", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "H2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [],
+    effects: ["bubble", "heat_glow"],
+    equation: "2HCl + Mg → MgCl₂ + H₂↑",
+    description: "镁与盐酸剧烈反应产生氢气",
+    tempDelta: 25,
+    phChange: 2,
+    priority: 8,
+  }),
+  createReactionRule({
+    id: "HCl+Zn",
+    name: "锌与盐酸反应",
+    type: "displacement",
+    reactants: [{ materialId: "HCl", stoichiometry: 2 }, { materialId: "Zn", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "H2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [],
+    effects: ["bubble"],
+    equation: "2HCl + Zn → ZnCl₂ + H₂↑",
+    description: "锌与盐酸反应产生氢气",
+    tempDelta: 15,
+    phChange: 2,
+    priority: 8,
+  }),
+  createReactionRule({
+    id: "HCl+Fe",
+    name: "铁与盐酸反应",
+    type: "displacement",
+    reactants: [{ materialId: "HCl", stoichiometry: 2 }, { materialId: "Fe", stoichiometry: 1 }],
+    products: [
+      { materialId: "FeSO4", stoichiometry: 1, phase: "aqueous", color: "#86efac" },
+      { materialId: "H2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [],
+    effects: ["bubble"],
+    equation: "2HCl + Fe → FeCl₂ + H₂↑",
+    description: "铁与盐酸反应，溶液变为浅绿色",
+    tempDelta: 12,
+    phChange: 2,
+    priority: 8,
+  }),
+  createReactionRule({
+    id: "CuSO4+Fe",
+    name: "铁置换铜",
+    type: "displacement",
+    reactants: [{ materialId: "CuSO4", stoichiometry: 1 }, { materialId: "Fe", stoichiometry: 1 }],
+    products: [
+      { materialId: "FeSO4", stoichiometry: 1, phase: "aqueous", color: "#86efac" },
+      { materialId: "Cu", stoichiometry: 1, phase: "solid", color: "#f59e0b" },
+    ],
+    conditions: [],
+    effects: ["precipitate"],
+    equation: "Fe + CuSO₄ → FeSO₄ + Cu",
+    description: "铁置换铜，铁表面出现红色固体",
+    tempDelta: 3,
+    phChange: 0,
+    priority: 8,
+  }),
+  createReactionRule({
+    id: "AgNO3+Cu",
+    name: "铜置换银",
+    type: "displacement",
+    reactants: [{ materialId: "AgNO3", stoichiometry: 2 }, { materialId: "Cu", stoichiometry: 1 }],
+    products: [
+      { materialId: "NaCl", stoichiometry: 1, phase: "aqueous" },
+      { materialId: "Ag", stoichiometry: 2, phase: "solid", color: "#e5e7eb" },
+    ],
+    conditions: [],
+    effects: ["precipitate"],
+    equation: "Cu + 2AgNO₃ → Cu(NO₃)₂ + 2Ag",
+    description: "铜置换银，铜表面出现银白色固体",
+    tempDelta: 8,
+    phChange: 0,
+    priority: 8,
+  }),
+
+  // ---------- 氧化物反应 ----------
+  createReactionRule({
+    id: "CuO+HCl",
+    name: "氧化铜与盐酸反应",
+    type: "redox",
+    reactants: [{ materialId: "CuO", stoichiometry: 1 }, { materialId: "HCl", stoichiometry: 2 }],
+    products: [
+      { materialId: "CuSO4", stoichiometry: 1, phase: "aqueous", color: "#22d3ee" },
+      { materialId: "H2O", stoichiometry: 1, phase: "liquid" },
+    ],
+    conditions: [],
+    effects: ["heat_glow"],
+    equation: "CuO + 2HCl → CuCl₂ + H₂O",
+    description: "黑色氧化铜溶解，溶液变为蓝绿色",
+    tempDelta: 10,
+    phChange: 2,
+    priority: 7,
+  }),
+  createReactionRule({
+    id: "CaO+H2O",
+    name: "生石灰遇水",
+    type: "combination",
+    reactants: [{ materialId: "CaO", stoichiometry: 1 }, { materialId: "H2O", stoichiometry: 1 }],
+    products: [{ materialId: "Ca(OH)2", stoichiometry: 1, phase: "aqueous" }],
+    conditions: [],
+    effects: ["heat_glow", "steam"],
+    equation: "CaO + H₂O → Ca(OH)₂",
+    description: "生石灰遇水剧烈放热",
+    tempDelta: 65,
+    phChange: 3,
+    priority: 10,
+  }),
+
+  // ---------- 络合反应 ----------
+  createReactionRule({
+    id: "FeCl3+KSCN",
+    name: "铁离子与硫氰酸根络合",
+    type: "complexation",
+    reactants: [{ materialId: "FeCl3", stoichiometry: 1 }, { materialId: "KSCN", stoichiometry: 3 }],
+    products: [{ materialId: "FeCl3", stoichiometry: 1, phase: "aqueous", color: "#dc2626" }],
+    conditions: [],
+    effects: ["color_change"],
+    equation: "FeCl₃ + 3KSCN → Fe(SCN)₃ + 3KCl",
+    description: "铁离子与硫氰酸根络合，溶液变为血红色",
+    tempDelta: 0,
+    phChange: 0,
+    priority: 9,
+  }),
+
+  // ---------- 分解反应 ----------
+  createReactionRule({
+    id: "H2O2_decompose",
+    name: "过氧化氢分解",
+    type: "decomposition",
+    reactants: [{ materialId: "H2O2", stoichiometry: 2 }],
+    products: [
+      { materialId: "H2O", stoichiometry: 2, phase: "liquid" },
+      { materialId: "O2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [{ type: "catalyst", operator: "eq", value: 1, catalystId: "MnO2" }],
+    effects: ["bubble"],
+    equation: "2H₂O₂ →(MnO₂) 2H₂O + O₂↑",
+    description: "二氧化锰催化过氧化氢分解",
+    tempDelta: -5,
+    phChange: 0,
+    priority: 7,
+  }),
+  createReactionRule({
+    id: "NaHCO3_decompose",
+    name: "碳酸氢钠分解",
+    type: "decomposition",
+    reactants: [{ materialId: "NaHCO3", stoichiometry: 2 }],
+    products: [
+      { materialId: "Na2CO3", stoichiometry: 1, phase: "solid" },
+      { materialId: "H2O", stoichiometry: 1, phase: "liquid" },
+      { materialId: "CO2", stoichiometry: 1, phase: "gas" },
+    ],
+    conditions: [{ type: "temperature", operator: "gte", value: 270 }],
+    effects: ["bubble", "steam"],
+    equation: "2NaHCO₃ →(加热) Na₂CO₃ + H₂O + CO₂↑",
+    description: "碳酸氢钠受热分解",
+    tempDelta: 30,
+    phChange: 1,
+    priority: 6,
+  }),
+];
+
+export function initReactionRules(): ReactionRule[] {
+  return REACTION_RULES;
+}

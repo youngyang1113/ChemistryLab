@@ -24,7 +24,7 @@ import {
 const initialState = {
   beakerContents: [],       // 试剂 ID 数组
   liquidColor: DEFAULT_COLORS.LIQUID,
-  liquidLevel: LIQUID_LEVEL.INITIAL,
+  liquidLevel: 0,           // 初始液位为 0，添加液体试剂后才增加
   temperature: TEMPERATURE.ROOM_TEMP,
   ph: PH.NEUTRAL,
   effect: "none",

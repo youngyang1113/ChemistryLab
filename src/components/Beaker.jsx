@@ -184,34 +184,65 @@ const EmptyState = React.memo(function EmptyState() {
   );
 });
 
+// 不规则固体生成器
+function generateIrregularPath(seed, size) {
+  const points = [];
+  const sides = 5 + (seed % 4);
+  const r = size / 2;
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+    const variance = 0.65 + ((seed * (i + 1) * 17) % 100) / 100 * 0.7;
+    const px = 50 + Math.cos(angle) * r * variance * 2;
+    const py = 50 + Math.sin(angle) * r * variance * 2;
+    points.push(`${px.toFixed(1)}% ${py.toFixed(1)}%`);
+  }
+  return `polygon(${points.join(", ")})`;
+}
+
+function generateChunkStyle(reagent, index) {
+  const seed = reagent.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0) + index * 31;
+  const size = 22 + (seed % 18);
+  const x = 10 + (seed * 7 % 70);
+  const y = -(seed * 3 % 20);
+  const rotate = -30 + (seed % 61);
+  const clipPath = generateIrregularPath(seed, 50);
+
+  return {
+    width: `${size}px`,
+    height: `${size}px`,
+    backgroundColor: reagent.color,
+    clipPath,
+    transform: `translateX(${x}%) translateY(${y}px) rotate(${rotate}deg)`,
+    boxShadow: "none",
+  };
+}
+
 // 固体块状物显示
-const SolidChunks = React.memo(function SolidChunks({ solidReagents }) {
+const SolidChunks = React.memo(function SolidChunks({ solidReagents, reacting }) {
   if (!solidReagents || solidReagents.length === 0) return null;
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-8 pointer-events-none">
-      <div className="flex flex-wrap justify-center gap-1 px-4 pb-1">
+      <div className="relative w-full h-16">
         {solidReagents.map((r, i) => {
-          const hash = r.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-          const w = 12 + (hash % 10);
-          const h = 8 + (hash % 8);
-          const br = 2 + (hash % 4);
-          const rotate = -5 + (hash % 11);
-
+          const style = generateChunkStyle(r, i);
           return (
             <motion.div
               key={r.id}
-              initial={{ y: -30, opacity: 0, scale: 0.5 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.08, duration: 0.4, ease: "easeOut" }}
+              initial={{ y: -40, opacity: 0, scale: 0.3 }}
+              animate={{
+                y: 0,
+                opacity: 1,
+                scale: 1,
+              }}
+              exit={{ opacity: 0, scale: 0, transition: { duration: 0.5 } }}
+              transition={{ delay: i * 0.06, duration: 0.5, ease: "easeOut" }}
               title={r.name}
+              className="absolute left-1/2 bottom-2"
               style={{
-                width: `${w}px`,
-                height: `${h}px`,
-                backgroundColor: r.color,
-                borderRadius: `${br}px`,
-                transform: `rotate(${rotate}deg)`,
-                boxShadow: `inset 0 1px 2px rgba(255,255,255,0.3), inset 0 -1px 2px rgba(0,0,0,0.2)`,
+                ...style,
+                marginLeft: `-${parseInt(style.width) / 2}px`,
+                filter: "brightness(0.95) contrast(1.05)",
               }}
             />
           );
@@ -289,19 +320,47 @@ const PhaseAddEffect = React.memo(function PhaseAddEffect({ phase }) {
 // ==================== 主组件 ====================
 
 const Beaker = React.memo(function Beaker({ state, reagents: reagentList }) {
-  const { liquidColor, liquidLevel, effect, precipitateColor, isReacting, shakeIntensity, temperature } = state;
+  const { liquidColor, liquidLevel, effect, precipitateColor, isReacting, shakeIntensity, temperature, currentReaction } = state;
   const hasContents = state.beakerContents.length > 0;
 
   const [addPhase, setAddPhase] = useState(null);
   const prevContentsLenRef = useRef(state.beakerContents.length);
+  const prevReactingRef = useRef(false);
+  const [consumedSolids, setConsumedSolids] = useState(new Set());
 
-  // 使用索引查找固体试剂 O(1) 替代 O(n)
+  // 反应发生时，标记参与反应的固体为已消耗
+  useEffect(() => {
+    if (isReacting && !prevReactingRef.current && currentReaction) {
+      const reactantIds = currentReaction.reactants || [];
+      const consumed = new Set();
+      for (const id of reactantIds) {
+        const reagent = getReagentById(id);
+        if (reagent && reagent.phase === "solid") {
+          consumed.add(id);
+        }
+      }
+      if (consumed.size > 0) {
+        setConsumedSolids((prev) => new Set([...prev, ...consumed]));
+      }
+    }
+    prevReactingRef.current = isReacting;
+  }, [isReacting, currentReaction]);
+
+  // 重置时清空消耗记录
+  useEffect(() => {
+    if (state.beakerContents.length === 0) {
+      setConsumedSolids(new Set());
+    }
+  }, [state.beakerContents.length]);
+
+  // 使用索引查找固体试剂 O(1) 替代 O(n)，排除已消耗的
   const solidReagents = useMemo(() => {
     if (!reagentList) return [];
     return state.beakerContents
+      .filter((id) => !consumedSolids.has(id))
       .map((id) => getReagentById(id))
       .filter((r) => r && r.phase === "solid");
-  }, [state.beakerContents, reagentList]);
+  }, [state.beakerContents, reagentList, consumedSolids]);
 
   // 物相添加特效
   useEffect(() => {
@@ -325,8 +384,8 @@ const Beaker = React.memo(function Beaker({ state, reagents: reagentList }) {
         <motion.div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className="relative w-full max-w-[400px] mx-auto"
-          style={{ height: "calc(100vh - 250px)", minHeight: "350px", maxHeight: "600px" }}
+          className="relative w-full max-w-[480px] mx-auto"
+          style={{ height: "calc(100vh - 250px)", minHeight: "420px", maxHeight: "720px" }}
           animate={
             shakeIntensity > 0
               ? {
@@ -362,7 +421,9 @@ const Beaker = React.memo(function Beaker({ state, reagents: reagentList }) {
               {hasContents && <WavyLiquid color={liquidColor} level={liquidLevel} />}
             </AnimatePresence>
 
-            <SolidChunks solidReagents={solidReagents} />
+            <AnimatePresence>
+              <SolidChunks solidReagents={solidReagents} reacting={isReacting} />
+            </AnimatePresence>
 
             {/* Canvas 特效 - 性能优化 */}
             <CanvasBubbleEffect

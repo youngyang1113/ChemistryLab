@@ -537,8 +537,9 @@ export const moreRedoxRecipes = {
     tempDelta: 15,
     effect: "gas",
     description: "铜与稀硝酸反应（产生无色NO气体）",
+    concentration: "dilute",
   },
-  "HNO3+Cu_浓": {
+  "HNO3+Cu_concentrated": {
     type: REACTION_TYPES.Redox,
     equation: "Cu + 4HNO₃(浓) → Cu(NO₃)₂ + 2NO₂↑ + 2H₂O",
     color: "#92400e",
@@ -546,6 +547,8 @@ export const moreRedoxRecipes = {
     tempDelta: 20,
     effect: "gas",
     description: "铜与浓硝酸反应（产生红棕色NO₂气体）",
+    concentration: "concentrated",
+    reactants: ["HNO3", "Cu"],
   },
   "H2SO4+Cu": {
     type: REACTION_TYPES.Redox,
@@ -555,8 +558,10 @@ export const moreRedoxRecipes = {
     tempDelta: 25,
     effect: "gas",
     description: "铜与浓硫酸加热反应",
+    requiresHeat: true,
+    heatThreshold: 200,
   },
-  "C+H2SO4_浓": {
+  "C+H2SO4": {
     type: REACTION_TYPES.Redox,
     equation: "C + 2H₂SO₄(浓) →(加热) CO₂↑ + 2SO₂↑ + 2H₂O",
     color: "#f97316",
@@ -564,6 +569,10 @@ export const moreRedoxRecipes = {
     tempDelta: 40,
     effect: "smoke",
     description: "碳与浓硫酸加热反应",
+    requiresHeat: true,
+    heatThreshold: 300,
+    concentration: "concentrated",
+    reactants: ["C", "H2SO4"],
   },
   "Fe+I2": {
     type: REACTION_TYPES.Combination,
@@ -573,6 +582,8 @@ export const moreRedoxRecipes = {
     tempDelta: 30,
     effect: "heat",
     description: "铁与碘反应生成碘化亚铁",
+    requiresHeat: true,
+    heatThreshold: 200,
   },
 };
 

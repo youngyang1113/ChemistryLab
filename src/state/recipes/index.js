@@ -588,15 +588,6 @@ const displacementRecipes = {
     effect: "gas",
     description: "铝与氢氧化钠溶液反应（铝的两性）",
   },
-  "FeCl3+Cu": {
-    type: REACTION_TYPES.Redox,
-    equation: "2FeCl₃ + Cu → 2FeCl₂ + CuCl₂",
-    color: "#86efac",
-    ph: 4,
-    tempDelta: 5,
-    effect: "heat",
-    description: "铜与氯化铁反应（湿法刻蚀铜）",
-  },
 };
 
 // ==================== 氧化物反应 ====================
@@ -1136,7 +1127,7 @@ const decompositionRecipes = {
     effect: "gas",
     description: "电解水",
   },
-  "CaCO3+heat": {
+  "CaCO3": {
     type: REACTION_TYPES.Decomposition,
     equation: "CaCO₃ →(高温) CaO + CO₂↑",
     color: "#d9f99d",
@@ -1144,8 +1135,10 @@ const decompositionRecipes = {
     tempDelta: 80,
     effect: "gas",
     description: "石灰石高温分解",
+    requiresHeat: true,
+    heatThreshold: 800,
   },
-  "NaHCO3+heat": {
+  "NaHCO3": {
     type: REACTION_TYPES.Decomposition,
     equation: "2NaHCO₃ →(加热) Na₂CO₃ + H₂O + CO₂↑",
     color: "#fef08a",
@@ -1153,8 +1146,10 @@ const decompositionRecipes = {
     tempDelta: 30,
     effect: "gas",
     description: "碳酸氢钠受热分解",
+    requiresHeat: true,
+    heatThreshold: 270,
   },
-  "NH4HCO3+heat": {
+  "NH4HCO3": {
     type: REACTION_TYPES.Decomposition,
     equation: "NH₄HCO₃ →(加热) NH₃↑ + H₂O + CO₂↑",
     color: "#67e8f9",
@@ -1162,8 +1157,10 @@ const decompositionRecipes = {
     tempDelta: 25,
     effect: "gas",
     description: "碳酸氢铵受热分解",
+    requiresHeat: true,
+    heatThreshold: 100,
   },
-  "KClO3+heat": {
+  "KClO3": {
     type: REACTION_TYPES.Decomposition,
     equation: "2KClO₃ →(MnO₂/加热) 2KCl + 3O₂↑",
     color: "#f5f5f4",
@@ -1171,8 +1168,11 @@ const decompositionRecipes = {
     tempDelta: 20,
     effect: "gas",
     description: "氯酸钾分解制氧气",
+    requiresHeat: true,
+    requiresCatalyst: "MnO2",
+    heatThreshold: 400,
   },
-  "KMnO4+heat": {
+  "KMnO4": {
     type: REACTION_TYPES.Decomposition,
     equation: "2KMnO₄ →(加热) K₂MnO₄ + MnO₂ + O₂↑",
     color: "#c084fc",
@@ -1180,8 +1180,10 @@ const decompositionRecipes = {
     tempDelta: 15,
     effect: "gas",
     description: "高锰酸钾受热分解",
+    requiresHeat: true,
+    heatThreshold: 240,
   },
-  "Cu(OH)2+heat": {
+  "Cu(OH)2": {
     type: REACTION_TYPES.Decomposition,
     equation: "Cu(OH)₂ →(加热) CuO + H₂O",
     color: "#1e293b",
@@ -1189,8 +1191,10 @@ const decompositionRecipes = {
     tempDelta: 10,
     effect: "heat",
     description: "氢氧化铜受热分解",
+    requiresHeat: true,
+    heatThreshold: 100,
   },
-  "Fe(OH)3+heat": {
+  "Fe(OH)3": {
     type: REACTION_TYPES.Decomposition,
     equation: "2Fe(OH)₃ →(加热) Fe₂O₃ + 3H₂O",
     color: "#b91c1c",
@@ -1198,6 +1202,8 @@ const decompositionRecipes = {
     tempDelta: 12,
     effect: "heat",
     description: "氢氧化铁受热分解",
+    requiresHeat: true,
+    heatThreshold: 500,
   },
 };
 
@@ -1292,37 +1298,94 @@ function getSortedKey(reactants) {
   return [...reactants].sort().join("+");
 }
 
-export function findReaction(existing, incoming) {
-  // 确保 existing 是数组
+/**
+ * 检查反应条件是否满足
+ * @param {Object} recipe - 反应配方
+ * @param {Object} context - 上下文信息
+ * @returns {boolean} 条件是否满足
+ */
+function checkReactionConditions(recipe, context) {
+  // 检查是否需要加热条件
+  if (recipe.requiresHeat) {
+    const currentTemp = context.temperature || 25;
+    const heatThreshold = recipe.heatThreshold || 100;
+    if (currentTemp < heatThreshold) {
+      return false;
+    }
+  }
+  
+  // 检查是否需要催化剂
+  if (recipe.requiresCatalyst) {
+    const beakerContents = context.beakerContents || [];
+    if (!beakerContents.includes(recipe.requiresCatalyst)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+export function findReaction(existing, incoming, context = {}) {
   const existingArray = Array.isArray(existing) ? existing : [existing];
   const allReactants = [...existingArray, incoming];
-  const sortedKey = getSortedKey(allReactants);
 
-  // 精确匹配：所有反应物完全匹配
+  // 1. 精确匹配：所有反应物完全匹配（任意顺序）
+  const sortedKey = getSortedKey(allReactants);
   const exactMatch = reactionIndex.get(sortedKey);
-  if (exactMatch) {
+  if (exactMatch && checkReactionConditions(exactMatch.recipe, context)) {
     return { key: exactMatch.key, ...exactMatch.recipe };
   }
 
-  // 子集匹配：检查是否有反应是当前试剂的子集
-  for (const [indexKey, { key, recipe, reactants }] of reactionIndex) {
-    const isSubset = reactants.every((r) => allReactants.includes(r));
-    if (isSubset && reactants.length === allReactants.length) {
+  // 2. 遍历所有反应，检查当前烧杯中的试剂是否恰好匹配某反应的反应物
+  for (const [, { key, recipe, reactants }] of reactionIndex) {
+    if (reactants.length !== allReactants.length) continue;
+    const allPresent = reactants.every((r) => allReactants.includes(r));
+    if (allPresent && checkReactionConditions(recipe, context)) {
       return { key, ...recipe };
     }
   }
 
-  // 向前兼容：尝试旧的二元匹配方式
+  // 3. 检查任意两个试剂之间的反应（不限于新试剂）
+  for (let i = 0; i < allReactants.length; i++) {
+    for (let j = i + 1; j < allReactants.length; j++) {
+      const a = allReactants[i];
+      const b = allReactants[j];
+      const pairKey = getSortedKey([a, b]);
+      const pairMatch = reactionIndex.get(pairKey);
+      if (pairMatch && checkReactionConditions(pairMatch.recipe, context)) {
+        return { key: pairMatch.key, ...pairMatch.recipe };
+      }
+    }
+  }
+
+  // 4. 向前兼容：尝试旧的二元匹配方式
   for (const reagent of existingArray) {
     const key1 = `${reagent}+${incoming}`;
     const key2 = `${incoming}+${reagent}`;
-    if (reactionRecipes[key1]) return { key: key1, ...reactionRecipes[key1] };
-    if (reactionRecipes[key2]) return { key: key2, ...reactionRecipes[key2] };
+    if (reactionRecipes[key1] && checkReactionConditions(reactionRecipes[key1], context)) {
+      return { key: key1, ...reactionRecipes[key1] };
+    }
+    if (reactionRecipes[key2] && checkReactionConditions(reactionRecipes[key2], context)) {
+      return { key: key2, ...reactionRecipes[key2] };
+    }
   }
 
-  // 单物质反应（分解反应等）
+  // 5. 单物质反应（分解反应等）
   if (reactionRecipes[incoming]) {
-    return { key: incoming, ...reactionRecipes[incoming] };
+    const recipe = reactionRecipes[incoming];
+    if (checkReactionConditions(recipe, context)) {
+      return { key: incoming, ...recipe };
+    }
+  }
+
+  // 6. 检查烧杯中的物质是否可以单独分解
+  for (const reagent of existingArray) {
+    if (reactionRecipes[reagent]) {
+      const recipe = reactionRecipes[reagent];
+      if (recipe.requiresHeat && checkReactionConditions(recipe, context)) {
+        return { key: reagent, ...recipe };
+      }
+    }
   }
 
   return null;
