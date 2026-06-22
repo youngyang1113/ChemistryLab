@@ -1,6 +1,5 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
 import "./index.css";
 
 class ErrorBoundary extends React.Component {
@@ -59,25 +58,41 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// 移除 fallback 元素
-const removeFallback = () => {
+// 移除 fallback
+function removeFallback() {
   const fallback = document.getElementById("fallback");
-  if (fallback) {
-    fallback.style.display = "none";
-    fallback.remove();
+  if (fallback) fallback.remove();
+}
+
+// 异步加载 App 并渲染
+async function bootstrap() {
+  try {
+    const { default: App } = await import("./App");
+    removeFallback();
+
+    const rootElement = document.getElementById("root");
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  } catch (error) {
+    console.error("Bootstrap Error:", error);
+    removeFallback();
+
+    const rootElement = document.getElementById("root");
+    rootElement.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f8fafc;flex-direction:column;gap:16px;text-align:center;padding:20px;font-family:system-ui,sans-serif">
+        <div style="font-size:48px">⚠️</div>
+        <div style="font-size:20px;font-weight:600;color:#374151">应用加载失败</div>
+        <div style="color:#ef4444;font-size:13px;max-width:400px;background:#fef2f2;padding:12px;border-radius:8px">${error.message || "请检查网络连接后重试"}</div>
+        <button onclick="window.location.reload()" style="margin-top:8px;padding:10px 24px;background:#3b82f6;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500">重新加载</button>
+      </div>
+    `;
   }
-};
+}
 
-const rootElement = document.getElementById("root");
-
-// 清空 root 内容（移除 fallback）
-rootElement.innerHTML = "";
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+bootstrap();
